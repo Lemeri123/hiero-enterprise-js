@@ -359,17 +359,33 @@ describe("HieroContext", () => {
             }
         });
 
-        it("propagates a throwing onBeforeTransaction listener so it can veto the transaction", async () => {
-            const ctx = new HieroContext(validConfig);
-            ctx.addTransactionListener({
-                onBeforeTransaction: () => {
-                    throw new Error("blocked by policy");
-                },
-            });
+        it("isolates throwing onBeforeTransaction listeners and still notifies the rest", async () => {
+            const emitWarning = vi
+                .spyOn(process, "emitWarning")
+                .mockImplementation(() => undefined);
+            try {
+                const ctx = new HieroContext(validConfig);
+                const later = { onBeforeTransaction: vi.fn() };
+                ctx.addTransactionListener({
+                    onBeforeTransaction: () => {
+                        throw new Error("metrics backend down");
+                    },
+                });
+                ctx.addTransactionListener(later);
 
-            await expect(ctx.emitBeforeTransaction(event)).rejects.toThrow(
-                "blocked by policy",
-            );
+                await expect(
+                    ctx.emitBeforeTransaction(event),
+                ).resolves.toBeUndefined();
+                expect(later.onBeforeTransaction).toHaveBeenCalledWith(event);
+                expect(emitWarning).toHaveBeenCalledWith(
+                    expect.stringContaining(
+                        "onBeforeTransaction listener threw for AccountService.createAccount: metrics backend down",
+                    ),
+                    expect.objectContaining({ code: "HIERO_LISTENER_ERROR" }),
+                );
+            } finally {
+                emitWarning.mockRestore();
+            }
         });
     });
 

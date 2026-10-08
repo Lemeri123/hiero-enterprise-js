@@ -297,6 +297,22 @@ describe("QueryExecutor", () => {
             ).resolves.toBe("query-result");
         });
 
+        it("still runs when an onBeforeTransaction listener throws", async () => {
+            ctx.addTransactionListener({
+                onBeforeTransaction: () => {
+                    throw new Error("metrics backend down");
+                },
+            });
+
+            const result = await new QueryExecutor(ctx).run(
+                query as never,
+                {},
+                SAMPLE_EVENT,
+            );
+
+            expect(result).toBe("query-result");
+        });
+
         it("keeps the original error when an onAfterTransaction listener throws", async () => {
             const original = new Error("query exploded");
             query.execute.mockRejectedValueOnce(original);

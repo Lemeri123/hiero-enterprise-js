@@ -412,6 +412,22 @@ describe("TransactionExecutor", () => {
             expect(result.transactionId).toBe("0.0.123@1234567890.000000000");
         });
 
+        it("still runs when an onBeforeTransaction listener throws", async () => {
+            ctx.addTransactionListener({
+                onBeforeTransaction: () => {
+                    throw new Error("metrics backend down");
+                },
+            });
+
+            const result = await new TransactionExecutor(ctx).run(
+                bundle.tx as never,
+                {},
+                SAMPLE_EVENT,
+            );
+
+            expect(result.transactionId).toBe("0.0.123@1234567890.000000000");
+        });
+
         it("keeps the original error when an onAfterTransaction listener throws", async () => {
             const original = new Error("execute exploded");
             bundle.tx.execute.mockRejectedValueOnce(original);
