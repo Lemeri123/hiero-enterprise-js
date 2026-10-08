@@ -10,6 +10,7 @@ import type {
 } from "./operations/index.js";
 import { ScheduleInfoQuery } from "./queries/index.js";
 import type { ScheduleInfoResult } from "./queries/index.js";
+import type { QueryOptions } from "../transaction/index.js";
 
 /**
  * Service for interacting with scheduled transactions on the Hiero network.
@@ -72,9 +73,13 @@ export class ScheduleService {
      * executed, or cancelled, along with metadata (signers, memo, expiry).
      *
      * @param scheduleId - The schedule entity to query
+     * @param options - Optional query options (payer, payment caps, node targeting)
      * @returns A `ScheduleInfoResult` with all schedule metadata
      */
-    getInfo(scheduleId: string | ScheduleId): Promise<ScheduleInfoResult> {
-        return this.infoQuery.execute(scheduleId);
+    getInfo(
+        scheduleId: string | ScheduleId,
+        options?: QueryOptions,
+    ): Promise<ScheduleInfoResult> {
+        return this.infoQuery.execute(scheduleId, options);
     }
 }

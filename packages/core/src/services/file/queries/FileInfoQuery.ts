@@ -2,6 +2,8 @@ import type { FileId, KeyList } from "@hiero-ledger/sdk";
 import { FileInfoQuery as SdkFileInfoQuery } from "@hiero-ledger/sdk";
 import type { IHieroContext } from "../../../context/index.js";
 import { normalizeError } from "../../../errors/index.js";
+import { QueryExecutor } from "../../transaction/index.js";
+import type { QueryOptions } from "../../transaction/index.js";
 
 /**
  * A plain-object representation of a file's current consensus-node
@@ -49,7 +51,11 @@ export interface FileInfoResult {
  * mirror-node propagation lag.
  */
 export class FileInfoQuery {
-    constructor(private readonly context: IHieroContext) {}
+    private readonly executor: QueryExecutor;
+
+    constructor(context: IHieroContext) {
+        this.executor = new QueryExecutor(context);
+    }
 
     /**
      * Fetch the current state of a file from the consensus nodes.
@@ -58,12 +64,18 @@ export class FileInfoQuery {
      * @returns Plain-object file info — never `null`; throws if the
      *          file does not exist or the network rejects the query
      */
-    async execute(fileId: string | FileId): Promise<FileInfoResult> {
+    async execute(
+        fileId: string | FileId,
+        options: QueryOptions = {},
+    ): Promise<FileInfoResult> {
         try {
-            const info = await new SdkFileInfoQuery()
-                .setFileId(fileId)
-                .execute(this.context.client);
-
+            const query = new SdkFileInfoQuery().setFileId(fileId);
+            const info = await this.executor.run(query, options, {
+                type: "FileInfoQuery",
+                serviceName: "FileService",
+                methodName: "getFileInfo",
+                timestamp: new Date(),
+            });
             return {
                 fileId: info.fileId.toString(),
                 size: info.size.toNumber(),

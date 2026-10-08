@@ -1,7 +1,7 @@
 import type { FileId, Key } from "@hiero-ledger/sdk";
 import type { IHieroContext } from "../../context/index.js";
 import { HieroError, HieroErrorCodes } from "../../errors/index.js";
-import type { ScheduleOptions } from "../transaction/index.js";
+import type { QueryOptions, ScheduleOptions } from "../transaction/index.js";
 import {
     FileCreateOperation,
     FileAppendOperation,
@@ -325,10 +325,14 @@ export class FileService {
      * lag.
      *
      * @param fileId - The file entity ID (e.g., `"0.0.12345"`)
+     * @param options - Optional query options (payer, payment caps, node targeting)
      * @returns The raw file bytes — empty for a deleted file
      */
-    async getFileContents(fileId: string | FileId): Promise<Uint8Array> {
-        return await this.contentsQuery.execute(fileId);
+    async getFileContents(
+        fileId: string | FileId,
+        options?: QueryOptions,
+    ): Promise<Uint8Array> {
+        return await this.contentsQuery.execute(fileId, options);
     }
 
     /**
@@ -339,10 +343,14 @@ export class FileService {
      * lag.
      *
      * @param fileId - The file entity ID (e.g., `"0.0.12345"`)
+     * @param options - Optional query options (payer, payment caps, node targeting)
      * @returns Plain-object file info — never `null`; throws if the file does not exist
      */
-    async getFileInfo(fileId: string | FileId): Promise<GetFileInfoResult> {
-        return await this.infoQuery.execute(fileId);
+    async getFileInfo(
+        fileId: string | FileId,
+        options?: QueryOptions,
+    ): Promise<GetFileInfoResult> {
+        return await this.infoQuery.execute(fileId, options);
     }
 }
 

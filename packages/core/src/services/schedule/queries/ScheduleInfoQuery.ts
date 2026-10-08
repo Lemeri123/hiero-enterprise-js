@@ -2,6 +2,8 @@ import type { ScheduleId } from "@hiero-ledger/sdk";
 import { ScheduleInfoQuery as SdkScheduleInfoQuery } from "@hiero-ledger/sdk";
 import type { IHieroContext } from "../../../context/index.js";
 import { normalizeError } from "../../../errors/index.js";
+import { QueryExecutor } from "../../transaction/index.js";
+import type { QueryOptions } from "../../transaction/index.js";
 
 /**
  * A plain-object representation of a schedule entity.
@@ -54,17 +56,25 @@ export interface ScheduleInfoResult {
 }
 
 export class ScheduleInfoQuery {
-    constructor(private readonly context: IHieroContext) {}
+    private readonly executor: QueryExecutor;
+
+    constructor(context: IHieroContext) {
+        this.executor = new QueryExecutor(context);
+    }
 
     /** Get schedule info execute handler. */
     async execute(
         scheduleId: string | ScheduleId,
+        options: QueryOptions = {},
     ): Promise<ScheduleInfoResult> {
         try {
-            const info = await new SdkScheduleInfoQuery()
-                .setScheduleId(scheduleId)
-                .execute(this.context.client);
-
+            const query = new SdkScheduleInfoQuery().setScheduleId(scheduleId);
+            const info = await this.executor.run(query, options, {
+                type: "ScheduleInfoQuery",
+                serviceName: "ScheduleService",
+                methodName: "getInfo",
+                timestamp: new Date(),
+            });
             const isExecuted = info.executed !== null;
             const isDeleted = info.deleted !== null;
 

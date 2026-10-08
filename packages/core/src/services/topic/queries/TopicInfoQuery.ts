@@ -2,6 +2,8 @@ import type { CustomFixedFee, Key, TopicId } from "@hiero-ledger/sdk";
 import { TopicInfoQuery as SdkTopicInfoQuery } from "@hiero-ledger/sdk";
 import type { IHieroContext } from "../../../context/index.js";
 import { normalizeError } from "../../../errors/index.js";
+import { QueryExecutor } from "../../transaction/index.js";
+import type { QueryOptions } from "../../transaction/index.js";
 
 /**
  * A plain-object representation of a topic's current consensus-node
@@ -58,7 +60,11 @@ export interface TopicInfoResult {
  * mirror-node propagation lag.
  */
 export class TopicInfoQuery {
-    constructor(private readonly context: IHieroContext) {}
+    private readonly executor: QueryExecutor;
+
+    constructor(context: IHieroContext) {
+        this.executor = new QueryExecutor(context);
+    }
 
     /**
      * Fetch the current state of a topic from the consensus nodes.
@@ -67,12 +73,18 @@ export class TopicInfoQuery {
      * @returns Plain-object topic info — never `null`; throws if the
      *          topic does not exist or the network rejects the query
      */
-    async execute(topicId: string | TopicId): Promise<TopicInfoResult> {
+    async execute(
+        topicId: string | TopicId,
+        options: QueryOptions = {},
+    ): Promise<TopicInfoResult> {
         try {
-            const info = await new SdkTopicInfoQuery()
-                .setTopicId(topicId)
-                .execute(this.context.client);
-
+            const query = new SdkTopicInfoQuery().setTopicId(topicId);
+            const info = await this.executor.run(query, options, {
+                type: "TopicInfoQuery",
+                serviceName: "TopicService",
+                methodName: "getTopicInfo",
+                timestamp: new Date(),
+            });
             return {
                 topicId: info.topicId.toString(),
                 topicMemo: info.topicMemo,

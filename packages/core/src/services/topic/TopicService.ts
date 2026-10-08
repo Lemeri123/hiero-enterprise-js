@@ -1,6 +1,6 @@
 import type { SubscriptionHandle, TopicId } from "@hiero-ledger/sdk";
 import type { IHieroContext } from "../../context/index.js";
-import type { ScheduleOptions } from "../transaction/index.js";
+import type { QueryOptions, ScheduleOptions } from "../transaction/index.js";
 import {
     TopicCreateOperation,
     TopicUpdateOperation,
@@ -256,10 +256,14 @@ export class TopicService {
      * lag.
      *
      * @param topicId - The topic entity ID (e.g., `"0.0.12345"`)
+     * @param options - Optional query options (payer, payment caps, node targeting)
      * @returns Plain-object topic info
      */
-    async getTopicInfo(topicId: string | TopicId): Promise<GetTopicInfoResult> {
-        return await this.infoQuery.execute(topicId);
+    async getTopicInfo(
+        topicId: string | TopicId,
+        options?: QueryOptions,
+    ): Promise<GetTopicInfoResult> {
+        return await this.infoQuery.execute(topicId, options);
     }
 
     /**

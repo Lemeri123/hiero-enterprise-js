@@ -2,13 +2,14 @@ import type {
     ContractId,
     AccountId,
     Long,
-    Hbar,
     ContractFunctionParameters,
     ContractFunctionResult,
 } from "@hiero-ledger/sdk";
 import { ContractCallQuery as SdkContractCallQuery } from "@hiero-ledger/sdk";
 import type { IHieroContext } from "../../../context/index.js";
 import { normalizeError } from "../../../errors/index.js";
+import { QueryExecutor } from "../../transaction/index.js";
+import type { QueryOptions } from "../../transaction/index.js";
 
 /**
  * Options for invoking a view / pure contract function locally via
@@ -25,7 +26,7 @@ import { normalizeError } from "../../../errors/index.js";
  * - `rawFunctionParameters` — pre-encoded ABI bytes for advanced
  *   callers that build call data themselves.
  */
-export interface ContractCallQueryOptions {
+export interface ContractCallQueryOptions extends QueryOptions {
     /** Contract to invoke. */
     contractId: string | ContractId;
     /** Gas limit for the local call. Required. */
@@ -50,10 +51,6 @@ export interface ContractCallQueryOptions {
     senderAccountId?: string | AccountId;
     /** Maximum size of the returned result bytes. */
     maxResultSize?: number | Long;
-    /** Fixed query payment instead of letting the SDK estimate. */
-    queryPayment?: Hbar;
-    /** Cap on the SDK's auto-estimated query payment. */
-    maxQueryPayment?: Hbar;
 }
 
 /**
@@ -62,7 +59,11 @@ export interface ContractCallQueryOptions {
  * (`getUint256(0)`, `getString(0)`, `getAddress(0)`, …) directly.
  */
 export class ContractCallQuery {
-    constructor(private readonly context: IHieroContext) {}
+    private readonly executor: QueryExecutor;
+
+    constructor(context: IHieroContext) {
+        this.executor = new QueryExecutor(context);
+    }
 
     async execute(
         options: ContractCallQueryOptions,
@@ -92,15 +93,12 @@ export class ContractCallQuery {
                 query.setMaxResultSize(options.maxResultSize);
             }
 
-            if (options.queryPayment != null) {
-                query.setQueryPayment(options.queryPayment);
-            }
-
-            if (options.maxQueryPayment != null) {
-                query.setMaxQueryPayment(options.maxQueryPayment);
-            }
-
-            return await query.execute(this.context.client);
+            return await this.executor.run(query, options, {
+                type: "ContractCallQuery",
+                serviceName: "ContractService",
+                methodName: "callContract",
+                timestamp: new Date(),
+            });
         } catch (error) {
             throw normalizeError(error, "ContractService.callContract");
         }

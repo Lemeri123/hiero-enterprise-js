@@ -1,6 +1,8 @@
 import type { NftId } from "@hiero-ledger/sdk";
 import { TokenNftInfoQuery as SdkTokenNftInfoQuery } from "@hiero-ledger/sdk";
 import type { IHieroContext } from "../../../context/index.js";
+import { QueryExecutor } from "../../transaction/index.js";
+import type { QueryOptions } from "../../transaction/index.js";
 import {
     HieroError,
     HieroErrorCodes,
@@ -48,7 +50,11 @@ export interface TokenNftInfoResult {
  * inspect.
  */
 export class TokenNftInfoQuery {
-    constructor(private readonly context: IHieroContext) {}
+    private readonly executor: QueryExecutor;
+
+    constructor(context: IHieroContext) {
+        this.executor = new QueryExecutor(context);
+    }
 
     /**
      * Fetch info about the given NFT serial.
@@ -58,12 +64,18 @@ export class TokenNftInfoQuery {
      * @returns Plain-object info for the requested serial — throws if the
      *          serial does not exist or the network rejects the query
      */
-    async execute(nftId: string | NftId): Promise<TokenNftInfoResult> {
+    async execute(
+        nftId: string | NftId,
+        options: QueryOptions = {},
+    ): Promise<TokenNftInfoResult> {
         try {
-            const infos = await new SdkTokenNftInfoQuery()
-                .setNftId(nftId)
-                .execute(this.context.client);
-
+            const query = new SdkTokenNftInfoQuery().setNftId(nftId);
+            const infos = await this.executor.run(query, options, {
+                type: "TokenNftInfoQuery",
+                serviceName: "TokenService",
+                methodName: "getNftInfo",
+                timestamp: new Date(),
+            });
             const info = infos[0];
             if (info == null) {
                 throw new HieroError(
