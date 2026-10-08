@@ -51,7 +51,7 @@ export class QueryExecutor {
             );
         }
 
-        // Outside the try: the query has already succeeded.
+        // Emit the "after transaction" event now that the query has already succeeded.
         await this.context.emitAfterTransaction({
             ...event,
             status: Status.Success.toString(),

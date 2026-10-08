@@ -34,6 +34,7 @@ export class TransactionExecutor {
         // Apply base SDK options before any signing or execution
         this.applyBaseOptions(tx, options);
 
+        // Emit the "before transaction" event before any execution occurs.
         await this.context.emitBeforeTransaction(event);
         const start = Date.now();
 
@@ -69,7 +70,7 @@ export class TransactionExecutor {
         const transactionId = response.transactionId.toString();
         const status = receipt.status.toString();
 
-        // Outside the try: the transaction has reached consensus.
+        // Emit after the transaction has reached consensus.
         await this.context.emitAfterTransaction({
             ...event,
             transactionId,

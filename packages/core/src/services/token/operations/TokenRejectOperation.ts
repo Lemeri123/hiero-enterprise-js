@@ -78,8 +78,6 @@ export class TokenRejectOperation {
             throw normalizeError(error, "TokenService.rejectTokensFlow");
         }
 
-        // The flow checks the receipt of both inner transactions
-        // internally — getting here means both succeeded.
         await this.context.emitAfterTransaction({
             ...event,
             transactionId,
