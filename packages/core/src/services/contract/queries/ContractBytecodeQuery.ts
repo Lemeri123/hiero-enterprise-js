@@ -1,6 +1,7 @@
 import type { ContractId } from "@hiero-ledger/sdk";
 import { ContractByteCodeQuery as SdkContractByteCodeQuery } from "@hiero-ledger/sdk";
 import type { IHieroContext } from "../../../context/index.js";
+import { normalizeError } from "../../../errors/index.js";
 import { QueryExecutor } from "../../transaction/index.js";
 import type { QueryOptions } from "../../transaction/index.js";
 
@@ -22,10 +23,13 @@ export class ContractBytecodeQuery {
         contractId: string | ContractId,
         options: QueryOptions = {},
     ): Promise<Uint8Array> {
-        return await this.executor.run(
-            () => new SdkContractByteCodeQuery().setContractId(contractId),
-            options,
-            "ContractService.getContractBytecode",
-        );
+        try {
+            const query = new SdkContractByteCodeQuery().setContractId(
+                contractId,
+            );
+            return await this.executor.run(query, options);
+        } catch (error) {
+            throw normalizeError(error, "ContractService.getContractBytecode");
+        }
     }
 }

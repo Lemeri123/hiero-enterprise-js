@@ -7,6 +7,7 @@ import type {
 } from "@hiero-ledger/sdk";
 import { TokenInfoQuery as SdkTokenInfoQuery } from "@hiero-ledger/sdk";
 import type { IHieroContext } from "../../../context/index.js";
+import { normalizeError } from "../../../errors/index.js";
 import { QueryExecutor } from "../../transaction/index.js";
 import type { QueryOptions } from "../../transaction/index.js";
 
@@ -128,47 +129,44 @@ export class TokenInfoQuery {
         tokenId: string | TokenId,
         options: QueryOptions = {},
     ): Promise<TokenInfoResult> {
-        return await this.executor.run(
-            () => new SdkTokenInfoQuery().setTokenId(tokenId),
-            options,
-            "TokenService.getTokenInfo",
-            (info) => {
-                return {
-                    tokenId: info.tokenId.toString(),
-                    name: info.name,
-                    symbol: info.symbol,
-                    decimals: info.decimals,
-                    totalSupply: info.totalSupply.toString(),
-                    treasuryAccountId:
-                        info.treasuryAccountId?.toString() ?? null,
-                    adminKey: info.adminKey,
-                    kycKey: info.kycKey,
-                    freezeKey: info.freezeKey,
-                    pauseKey: info.pauseKey,
-                    wipeKey: info.wipeKey,
-                    supplyKey: info.supplyKey,
-                    feeScheduleKey: info.feeScheduleKey,
-                    metadataKey: info.metadataKey,
-                    defaultFreezeStatus: info.defaultFreezeStatus,
-                    defaultKycStatus: info.defaultKycStatus,
-                    pauseStatus: info.pauseStatus,
-                    isDeleted: info.isDeleted,
-                    autoRenewAccountId:
-                        info.autoRenewAccountId?.toString() ?? null,
-                    autoRenewPeriod:
-                        info.autoRenewPeriod?.seconds.toNumber() ?? null,
-                    expirationTime: info.expirationTime
-                        ? info.expirationTime.toDate().toISOString()
-                        : null,
-                    tokenMemo: info.tokenMemo,
-                    customFees: info.customFees,
-                    tokenType: info.tokenType,
-                    supplyType: info.supplyType,
-                    maxSupply: info.maxSupply?.toString() ?? null,
-                    ledgerId: info.ledgerId?.toString() ?? null,
-                    metadata: info.metadata,
-                };
-            },
-        );
+        try {
+            const query = new SdkTokenInfoQuery().setTokenId(tokenId);
+            const info = await this.executor.run(query, options);
+            return {
+                tokenId: info.tokenId.toString(),
+                name: info.name,
+                symbol: info.symbol,
+                decimals: info.decimals,
+                totalSupply: info.totalSupply.toString(),
+                treasuryAccountId: info.treasuryAccountId?.toString() ?? null,
+                adminKey: info.adminKey,
+                kycKey: info.kycKey,
+                freezeKey: info.freezeKey,
+                pauseKey: info.pauseKey,
+                wipeKey: info.wipeKey,
+                supplyKey: info.supplyKey,
+                feeScheduleKey: info.feeScheduleKey,
+                metadataKey: info.metadataKey,
+                defaultFreezeStatus: info.defaultFreezeStatus,
+                defaultKycStatus: info.defaultKycStatus,
+                pauseStatus: info.pauseStatus,
+                isDeleted: info.isDeleted,
+                autoRenewAccountId: info.autoRenewAccountId?.toString() ?? null,
+                autoRenewPeriod:
+                    info.autoRenewPeriod?.seconds.toNumber() ?? null,
+                expirationTime: info.expirationTime
+                    ? info.expirationTime.toDate().toISOString()
+                    : null,
+                tokenMemo: info.tokenMemo,
+                customFees: info.customFees,
+                tokenType: info.tokenType,
+                supplyType: info.supplyType,
+                maxSupply: info.maxSupply?.toString() ?? null,
+                ledgerId: info.ledgerId?.toString() ?? null,
+                metadata: info.metadata,
+            };
+        } catch (error) {
+            throw normalizeError(error, "TokenService.getTokenInfo");
+        }
     }
 }

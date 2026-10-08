@@ -39,11 +39,7 @@ export class AccountSignatureQuery {
         options: QueryOptions = {},
     ): Promise<boolean> {
         try {
-            const key = await this.fetchSinglePublicKey(
-                accountId,
-                options,
-                "verifyAccountSignature",
-            );
+            const key = await this.fetchSinglePublicKey(accountId, options);
             if (key === null) return false;
             return key.verify(message, signature);
         } catch (error) {
@@ -66,11 +62,7 @@ export class AccountSignatureQuery {
         options: QueryOptions = {},
     ): Promise<boolean> {
         try {
-            const key = await this.fetchSinglePublicKey(
-                accountId,
-                options,
-                "verifyAccountTransaction",
-            );
+            const key = await this.fetchSinglePublicKey(accountId, options);
             if (key === null) return false;
             return key.verifyTransaction(transaction);
         } catch (error) {
@@ -89,13 +81,9 @@ export class AccountSignatureQuery {
     private async fetchSinglePublicKey(
         accountId: string | AccountId,
         options: QueryOptions,
-        methodName: string,
     ): Promise<PublicKey | null> {
-        const info = await this.executor.run(
-            () => new SdkAccountInfoQuery().setAccountId(accountId),
-            options,
-            `AccountService.${methodName}`,
-        );
+        const query = new SdkAccountInfoQuery().setAccountId(accountId);
+        const info = await this.executor.run(query, options);
 
         if (!(info.key instanceof PublicKey)) {
             return null;

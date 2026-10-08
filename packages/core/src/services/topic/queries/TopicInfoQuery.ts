@@ -1,6 +1,7 @@
 import type { CustomFixedFee, Key, TopicId } from "@hiero-ledger/sdk";
 import { TopicInfoQuery as SdkTopicInfoQuery } from "@hiero-ledger/sdk";
 import type { IHieroContext } from "../../../context/index.js";
+import { normalizeError } from "../../../errors/index.js";
 import { QueryExecutor } from "../../transaction/index.js";
 import type { QueryOptions } from "../../transaction/index.js";
 
@@ -76,31 +77,29 @@ export class TopicInfoQuery {
         topicId: string | TopicId,
         options: QueryOptions = {},
     ): Promise<TopicInfoResult> {
-        return await this.executor.run(
-            () => new SdkTopicInfoQuery().setTopicId(topicId),
-            options,
-            "TopicService.getTopicInfo",
-            (info) => {
-                return {
-                    topicId: info.topicId.toString(),
-                    topicMemo: info.topicMemo,
-                    runningHash: info.runningHash,
-                    sequenceNumber: info.sequenceNumber.toString(),
-                    expirationTime: info.expirationTime
-                        ? info.expirationTime.toDate().toISOString()
-                        : null,
-                    adminKey: info.adminKey,
-                    submitKey: info.submitKey,
-                    feeScheduleKey: info.feeScheduleKey,
-                    feeExemptKeys: info.feeExemptKeys,
-                    autoRenewPeriod:
-                        info.autoRenewPeriod?.seconds.toNumber() ?? null,
-                    autoRenewAccountId:
-                        info.autoRenewAccountId?.toString() ?? null,
-                    customFees: info.customFees,
-                    ledgerId: info.ledgerId?.toString() ?? null,
-                };
-            },
-        );
+        try {
+            const query = new SdkTopicInfoQuery().setTopicId(topicId);
+            const info = await this.executor.run(query, options);
+            return {
+                topicId: info.topicId.toString(),
+                topicMemo: info.topicMemo,
+                runningHash: info.runningHash,
+                sequenceNumber: info.sequenceNumber.toString(),
+                expirationTime: info.expirationTime
+                    ? info.expirationTime.toDate().toISOString()
+                    : null,
+                adminKey: info.adminKey,
+                submitKey: info.submitKey,
+                feeScheduleKey: info.feeScheduleKey,
+                feeExemptKeys: info.feeExemptKeys,
+                autoRenewPeriod:
+                    info.autoRenewPeriod?.seconds.toNumber() ?? null,
+                autoRenewAccountId: info.autoRenewAccountId?.toString() ?? null,
+                customFees: info.customFees,
+                ledgerId: info.ledgerId?.toString() ?? null,
+            };
+        } catch (error) {
+            throw normalizeError(error, "TopicService.getTopicInfo");
+        }
     }
 }

@@ -10,6 +10,7 @@ import {
     TransactionRecordQuery,
 } from "@hiero-ledger/sdk";
 import type { IHieroContext } from "../../context/index.js";
+import { normalizeError } from "../../errors/index.js";
 import type { QueryOptions } from "../transaction/index.js";
 import { QueryExecutor } from "../transaction/index.js";
 
@@ -103,11 +104,11 @@ export class NetworkService {
             query.setIncludeDuplicates(options.includeDuplicates);
         }
 
-        return await this.queryExecutor.run(
-            query,
-            options,
-            "NetworkService.getTransactionReceipt",
-        );
+        try {
+            return await this.queryExecutor.run(query, options);
+        } catch (error) {
+            throw normalizeError(error, "NetworkService.getTransactionReceipt");
+        }
     }
 
     /**
@@ -142,11 +143,11 @@ export class NetworkService {
             query.setIncludeDuplicates(options.includeDuplicates);
         }
 
-        return await this.queryExecutor.run(
-            query,
-            options,
-            "NetworkService.getTransactionRecord",
-        );
+        try {
+            return await this.queryExecutor.run(query, options);
+        } catch (error) {
+            throw normalizeError(error, "NetworkService.getTransactionRecord");
+        }
     }
 
     /**
@@ -162,10 +163,10 @@ export class NetworkService {
     ): Promise<NetworkVersionInfo> {
         const query = new NetworkVersionInfoQuery();
 
-        return await this.queryExecutor.run(
-            query,
-            options,
-            "NetworkService.getNetworkVersionInfo",
-        );
+        try {
+            return await this.queryExecutor.run(query, options);
+        } catch (error) {
+            throw normalizeError(error, "NetworkService.getNetworkVersionInfo");
+        }
     }
 }

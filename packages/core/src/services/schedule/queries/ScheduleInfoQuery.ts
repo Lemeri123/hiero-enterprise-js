@@ -1,6 +1,7 @@
 import type { ScheduleId } from "@hiero-ledger/sdk";
 import { ScheduleInfoQuery as SdkScheduleInfoQuery } from "@hiero-ledger/sdk";
 import type { IHieroContext } from "../../../context/index.js";
+import { normalizeError } from "../../../errors/index.js";
 import { QueryExecutor } from "../../transaction/index.js";
 import type { QueryOptions } from "../../transaction/index.js";
 
@@ -66,38 +67,37 @@ export class ScheduleInfoQuery {
         scheduleId: string | ScheduleId,
         options: QueryOptions = {},
     ): Promise<ScheduleInfoResult> {
-        return await this.executor.run(
-            () => new SdkScheduleInfoQuery().setScheduleId(scheduleId),
-            options,
-            "ScheduleService.getInfo",
-            (info) => {
-                const isExecuted = info.executed !== null;
-                const isDeleted = info.deleted !== null;
+        try {
+            const query = new SdkScheduleInfoQuery().setScheduleId(scheduleId);
+            const info = await this.executor.run(query, options);
+            const isExecuted = info.executed !== null;
+            const isDeleted = info.deleted !== null;
 
-                return {
-                    scheduleId: info.scheduleId.toString(),
-                    creatorAccountId: info.creatorAccountId?.toString() ?? null,
-                    payerAccountId: info.payerAccountId?.toString() ?? null,
-                    scheduleMemo: info.scheduleMemo,
-                    isExecuted,
-                    isDeleted,
-                    isPending: !isExecuted && !isDeleted,
-                    executedAt: info.executed
-                        ? info.executed.toDate().toISOString()
-                        : null,
-                    deletedAt: info.deleted
-                        ? info.deleted.toDate().toISOString()
-                        : null,
-                    expiresAt: info.expirationTime
-                        ? info.expirationTime.toDate().toISOString()
-                        : null,
-                    scheduledTransactionId:
-                        info.scheduledTransactionId?.toString() ?? null,
-                    // signers is a KeyList — toArray() gives the individual keys
-                    signerCount: info.signers?.toArray().length ?? 0,
-                    waitForExpiry: info.waitForExpiry,
-                };
-            },
-        );
+            return {
+                scheduleId: info.scheduleId.toString(),
+                creatorAccountId: info.creatorAccountId?.toString() ?? null,
+                payerAccountId: info.payerAccountId?.toString() ?? null,
+                scheduleMemo: info.scheduleMemo,
+                isExecuted,
+                isDeleted,
+                isPending: !isExecuted && !isDeleted,
+                executedAt: info.executed
+                    ? info.executed.toDate().toISOString()
+                    : null,
+                deletedAt: info.deleted
+                    ? info.deleted.toDate().toISOString()
+                    : null,
+                expiresAt: info.expirationTime
+                    ? info.expirationTime.toDate().toISOString()
+                    : null,
+                scheduledTransactionId:
+                    info.scheduledTransactionId?.toString() ?? null,
+                // signers is a KeyList — toArray() gives the individual keys
+                signerCount: info.signers?.toArray().length ?? 0,
+                waitForExpiry: info.waitForExpiry,
+            };
+        } catch (error) {
+            throw normalizeError(error, "ScheduleService.getInfo");
+        }
     }
 }

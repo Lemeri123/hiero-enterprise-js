@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Query, type Transaction } from "@hiero-ledger/sdk";
-import { HieroContext } from "../../src/context/index.js";
-import { HieroError } from "../../src/errors/index.js";
-import { OperatorKeyType } from "../../src/types/index.js";
+import { HieroContext } from "../../../../src/context/index.js";
+import { HieroError } from "../../../../src/errors/index.js";
+import { OperatorKeyType } from "../../../../src/types/index.js";
 import {
     AccountService,
     ContractService,
@@ -10,13 +10,12 @@ import {
     ScheduleService,
     TokenService,
     TopicService,
-} from "../../src/services/index.js";
-import type { QueryOptions } from "../../src/services/index.js";
+} from "../../../../src/services/index.js";
+import type { QueryOptions } from "../../../../src/services/index.js";
 
-// Every service query must go through QueryExecutor: QueryOptions and
-// error normalisation, and no transaction listener events (queries are not
-// transactions). Real SDK queries are built; only Query.execute (the
-// network call) is stubbed.
+// Every service query runs through QueryExecutor: its QueryOptions reach
+// the SDK query, errors carry the method's context, and no transaction
+// listener is notified. Only Query.execute (the network call) is stubbed.
 
 const OPTIONS: QueryOptions = { nodeAccountIds: ["0.0.3"] };
 

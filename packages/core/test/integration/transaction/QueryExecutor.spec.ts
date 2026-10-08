@@ -11,7 +11,6 @@ import {
 } from "../../utils/integration-fixtures.js";
 import { QueryExecutor } from "../../../src/services/transaction/index.js";
 import { AccountService } from "../../../src/services/index.js";
-import { HieroError } from "../../../src/errors/index.js";
 import type { HieroContext } from "../../../src/context/index.js";
 
 describe("QueryExecutor [Integration]", () => {
@@ -34,7 +33,6 @@ describe("QueryExecutor [Integration]", () => {
             const result = await executor.run(
                 new NetworkVersionInfoQuery(),
                 {},
-                "IntegrationTest.getNetworkVersionInfo",
             );
 
             expect(result.servicesVersion).toBeDefined();
@@ -50,11 +48,7 @@ describe("QueryExecutor [Integration]", () => {
                 onAfterTransaction: after,
             });
 
-            await executor.run(
-                new NetworkVersionInfoQuery(),
-                {},
-                "IntegrationTest.getNetworkVersionInfo",
-            );
+            await executor.run(new NetworkVersionInfoQuery(), {});
 
             expect(before).not.toHaveBeenCalled();
             expect(after).not.toHaveBeenCalled();
@@ -68,7 +62,6 @@ describe("QueryExecutor [Integration]", () => {
             const info = await executor.run(
                 new AccountInfoQuery().setAccountId(operatorId),
                 {},
-                "IntegrationTest.getAccountInfo",
             );
 
             expect(info.accountId.toString()).toBe(operatorId);
@@ -80,7 +73,6 @@ describe("QueryExecutor [Integration]", () => {
                     context.operatorAccountId!.toString(),
                 ),
                 { maxQueryPayment: 2 },
-                "IntegrationTest.getAccountInfo",
             );
 
             expect(info.accountId).toBeDefined();
@@ -92,7 +84,6 @@ describe("QueryExecutor [Integration]", () => {
                     context.operatorAccountId!.toString(),
                 ),
                 { queryPayment: new Hbar(1) },
-                "IntegrationTest.getAccountInfo",
             );
 
             expect(info.accountId).toBeDefined();
@@ -102,7 +93,6 @@ describe("QueryExecutor [Integration]", () => {
             const info = await executor.run(
                 new AccountInfoQuery().setAccountId(funded.accountId),
                 { payerAccountId: funded.accountId },
-                "IntegrationTest.getAccountInfo",
             );
 
             expect(info.accountId.toString()).toBe(funded.accountId);
@@ -110,7 +100,7 @@ describe("QueryExecutor [Integration]", () => {
     });
 
     describe("run() — error handling", () => {
-        it("normalises a failed query into HieroError without notifying transaction listeners", async () => {
+        it("rejects a failed query without notifying transaction listeners", async () => {
             const after = vi.fn();
             context.addTransactionListener({ onAfterTransaction: after });
 
@@ -121,9 +111,7 @@ describe("QueryExecutor [Integration]", () => {
             // timeout).
             const query = new AccountInfoQuery().setAccountId("0.0.99999999");
 
-            await expect(
-                executor.run(query, {}, "IntegrationTest.getAccountInfo"),
-            ).rejects.toBeInstanceOf(HieroError);
+            await expect(executor.run(query, {})).rejects.toThrow();
 
             expect(after).not.toHaveBeenCalled();
         });

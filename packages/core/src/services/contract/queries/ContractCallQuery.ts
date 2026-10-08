@@ -70,34 +70,33 @@ export class ContractCallQuery {
     ): Promise<ContractFunctionResult> {
         this.validate(options);
 
-        return await this.executor.run(
-            () => this.build(options),
-            options,
-            "ContractService.callContract",
-        );
-    }
+        try {
+            const query = new SdkContractCallQuery()
+                .setContractId(options.contractId)
+                .setGas(options.gas);
 
-    private build(options: ContractCallQueryOptions): SdkContractCallQuery {
-        const query = new SdkContractCallQuery()
-            .setContractId(options.contractId)
-            .setGas(options.gas);
+            if (options.functionName != null && options.functionName !== "") {
+                query.setFunction(
+                    options.functionName,
+                    options.functionParameters,
+                );
+            } else {
+                // validator guarantees rawFunctionParameters is set when functionName is not
+                query.setFunctionParameters(options.rawFunctionParameters!);
+            }
 
-        if (options.functionName != null && options.functionName !== "") {
-            query.setFunction(options.functionName, options.functionParameters);
-        } else {
-            // validator guarantees rawFunctionParameters is set when functionName is not
-            query.setFunctionParameters(options.rawFunctionParameters!);
+            if (options.senderAccountId != null) {
+                query.setSenderAccountId(options.senderAccountId);
+            }
+
+            if (options.maxResultSize != null) {
+                query.setMaxResultSize(options.maxResultSize);
+            }
+
+            return await this.executor.run(query, options);
+        } catch (error) {
+            throw normalizeError(error, "ContractService.callContract");
         }
-
-        if (options.senderAccountId != null) {
-            query.setSenderAccountId(options.senderAccountId);
-        }
-
-        if (options.maxResultSize != null) {
-            query.setMaxResultSize(options.maxResultSize);
-        }
-
-        return query;
     }
 
     /**

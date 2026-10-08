@@ -1,6 +1,7 @@
 import type { FileId, KeyList } from "@hiero-ledger/sdk";
 import { FileInfoQuery as SdkFileInfoQuery } from "@hiero-ledger/sdk";
 import type { IHieroContext } from "../../../context/index.js";
+import { normalizeError } from "../../../errors/index.js";
 import { QueryExecutor } from "../../transaction/index.js";
 import type { QueryOptions } from "../../transaction/index.js";
 
@@ -67,23 +68,22 @@ export class FileInfoQuery {
         fileId: string | FileId,
         options: QueryOptions = {},
     ): Promise<FileInfoResult> {
-        return await this.executor.run(
-            () => new SdkFileInfoQuery().setFileId(fileId),
-            options,
-            "FileService.getFileInfo",
-            (info) => {
-                return {
-                    fileId: info.fileId.toString(),
-                    size: info.size.toNumber(),
-                    expirationTime: info.expirationTime
-                        ? info.expirationTime.toDate().toISOString()
-                        : null,
-                    isDeleted: info.isDeleted,
-                    keys: info.keys ?? null,
-                    fileMemo: info.fileMemo,
-                    ledgerId: info.ledgerId?.toString() ?? null,
-                };
-            },
-        );
+        try {
+            const query = new SdkFileInfoQuery().setFileId(fileId);
+            const info = await this.executor.run(query, options);
+            return {
+                fileId: info.fileId.toString(),
+                size: info.size.toNumber(),
+                expirationTime: info.expirationTime
+                    ? info.expirationTime.toDate().toISOString()
+                    : null,
+                isDeleted: info.isDeleted,
+                keys: info.keys ?? null,
+                fileMemo: info.fileMemo,
+                ledgerId: info.ledgerId?.toString() ?? null,
+            };
+        } catch (error) {
+            throw normalizeError(error, "FileService.getFileInfo");
+        }
     }
 }

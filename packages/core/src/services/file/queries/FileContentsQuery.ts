@@ -1,6 +1,7 @@
 import type { FileId } from "@hiero-ledger/sdk";
 import { FileContentsQuery as SdkFileContentsQuery } from "@hiero-ledger/sdk";
 import type { IHieroContext } from "../../../context/index.js";
+import { normalizeError } from "../../../errors/index.js";
 import { QueryExecutor } from "../../transaction/index.js";
 import type { QueryOptions } from "../../transaction/index.js";
 
@@ -30,10 +31,11 @@ export class FileContentsQuery {
         fileId: string | FileId,
         options: QueryOptions = {},
     ): Promise<Uint8Array> {
-        return await this.executor.run(
-            () => new SdkFileContentsQuery().setFileId(fileId),
-            options,
-            "FileService.getFileContents",
-        );
+        try {
+            const query = new SdkFileContentsQuery().setFileId(fileId);
+            return await this.executor.run(query, options);
+        } catch (error) {
+            throw normalizeError(error, "FileService.getFileContents");
+        }
     }
 }

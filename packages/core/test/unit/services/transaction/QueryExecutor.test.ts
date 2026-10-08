@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { AccountId, Hbar, TransactionId } from "@hiero-ledger/sdk";
 import { QueryExecutor } from "../../../../src/services/transaction/index.js";
 import { createMockContext } from "../../../utils/mock-context.js";
-import { HieroError } from "../../../../src/errors/index.js";
 import {
     HieroContext,
     type IHieroContext,
@@ -26,8 +25,6 @@ function buildMockQuery(): MockQuery {
     };
 }
 
-const CONTEXT = "NetworkService.getNetworkVersionInfo";
-
 describe("QueryExecutor", () => {
     let context: IHieroContext;
     let executor: QueryExecutor;
@@ -42,7 +39,7 @@ describe("QueryExecutor", () => {
 
     describe("applyBaseOptions", () => {
         it("does not call any setters when options are empty", async () => {
-            await executor.run(query as never, {}, CONTEXT);
+            await executor.run(query as never, {});
 
             expect(query.setPaymentTransactionId).not.toHaveBeenCalled();
             expect(query.setMaxQueryPayment).not.toHaveBeenCalled();
@@ -51,11 +48,7 @@ describe("QueryExecutor", () => {
         });
 
         it("sets a payment transaction ID generated from a string payer", async () => {
-            await executor.run(
-                query as never,
-                { payerAccountId: "0.0.500" },
-                CONTEXT,
-            );
+            await executor.run(query as never, { payerAccountId: "0.0.500" });
 
             expect(query.setPaymentTransactionId).toHaveBeenCalledTimes(1);
             const txId = query.setPaymentTransactionId.mock
@@ -67,11 +60,7 @@ describe("QueryExecutor", () => {
         it("sets a payment transaction ID generated from an AccountId payer", async () => {
             const payer = AccountId.fromString("0.0.501");
 
-            await executor.run(
-                query as never,
-                { payerAccountId: payer },
-                CONTEXT,
-            );
+            await executor.run(query as never, { payerAccountId: payer });
 
             const txId = query.setPaymentTransactionId.mock
                 .calls[0][0] as TransactionId;
@@ -79,7 +68,7 @@ describe("QueryExecutor", () => {
         });
 
         it("coerces a numeric maxQueryPayment into an Hbar", async () => {
-            await executor.run(query as never, { maxQueryPayment: 2 }, CONTEXT);
+            await executor.run(query as never, { maxQueryPayment: 2 });
 
             const arg = query.setMaxQueryPayment.mock.calls[0][0] as Hbar;
             expect(arg).toBeInstanceOf(Hbar);
@@ -89,17 +78,13 @@ describe("QueryExecutor", () => {
         it("passes an Hbar maxQueryPayment through unchanged", async () => {
             const fee = new Hbar(5);
 
-            await executor.run(
-                query as never,
-                { maxQueryPayment: fee },
-                CONTEXT,
-            );
+            await executor.run(query as never, { maxQueryPayment: fee });
 
             expect(query.setMaxQueryPayment).toHaveBeenCalledWith(fee);
         });
 
         it("coerces a numeric queryPayment into an Hbar", async () => {
-            await executor.run(query as never, { queryPayment: 1 }, CONTEXT);
+            await executor.run(query as never, { queryPayment: 1 });
 
             const arg = query.setQueryPayment.mock.calls[0][0] as Hbar;
             expect(arg).toBeInstanceOf(Hbar);
@@ -107,11 +92,9 @@ describe("QueryExecutor", () => {
         });
 
         it("converts each string node ID into an AccountId", async () => {
-            await executor.run(
-                query as never,
-                { nodeAccountIds: ["0.0.3", "0.0.4"] },
-                CONTEXT,
-            );
+            await executor.run(query as never, {
+                nodeAccountIds: ["0.0.3", "0.0.4"],
+            });
 
             expect(query.setNodeAccountIds).toHaveBeenCalledTimes(1);
             const ids = query.setNodeAccountIds.mock.calls[0][0] as AccountId[];
@@ -122,7 +105,7 @@ describe("QueryExecutor", () => {
         });
 
         it("ignores an empty nodeAccountIds array", async () => {
-            await executor.run(query as never, { nodeAccountIds: [] }, CONTEXT);
+            await executor.run(query as never, { nodeAccountIds: [] });
 
             expect(query.setNodeAccountIds).not.toHaveBeenCalled();
         });
@@ -132,63 +115,18 @@ describe("QueryExecutor", () => {
         it("returns the query's resolved value", async () => {
             query.execute.mockResolvedValueOnce({ custom: "payload" });
 
-            const result = await executor.run(query as never, {}, CONTEXT);
+            const result = await executor.run(query as never, {});
 
             expect(result).toEqual({ custom: "payload" });
         });
 
-        it("builds the query from a builder function", async () => {
-            const result = await executor.run(
-                () => query as never,
-                {},
-                CONTEXT,
-            );
-
-            expect(result).toBe("query-result");
-        });
-    });
-
-    describe("error handling", () => {
-        it("normalises a thrown error into HieroError with the service.method context", async () => {
+        it("propagates the query's error unchanged", async () => {
             const original = new Error("query failed");
             query.execute.mockRejectedValueOnce(original);
 
-            await expect(
-                executor.run(query as never, {}, CONTEXT),
-            ).rejects.toMatchObject({
-                constructor: HieroError,
-                context: CONTEXT,
-                cause: original,
-            });
-        });
-
-        it("normalises an error thrown while building the query", async () => {
-            const invalidId = new Error("invalid format for entity ID");
-
-            await expect(
-                executor.run(
-                    () => {
-                        throw invalidId;
-                    },
-                    {},
-                    CONTEXT,
-                ),
-            ).rejects.toMatchObject({
-                constructor: HieroError,
-                context: CONTEXT,
-                cause: invalidId,
-            });
-        });
-
-        it("normalises an invalid nodeAccountIds entry", async () => {
-            await expect(
-                executor.run(
-                    query as never,
-                    { nodeAccountIds: ["bad"] },
-                    CONTEXT,
-                ),
-            ).rejects.toBeInstanceOf(HieroError);
-            expect(query.execute).not.toHaveBeenCalled();
+            await expect(executor.run(query as never, {})).rejects.toBe(
+                original,
+            );
         });
     });
 
@@ -215,7 +153,7 @@ describe("QueryExecutor", () => {
         });
 
         it("are not notified of a successful query", async () => {
-            await new QueryExecutor(ctx).run(query as never, {}, CONTEXT);
+            await new QueryExecutor(ctx).run(query as never, {});
 
             expect(listener.onBeforeTransaction).not.toHaveBeenCalled();
             expect(listener.onAfterTransaction).not.toHaveBeenCalled();
@@ -225,7 +163,7 @@ describe("QueryExecutor", () => {
             query.execute.mockRejectedValueOnce(new Error("query failed"));
 
             await new QueryExecutor(ctx)
-                .run(query as never, {}, CONTEXT)
+                .run(query as never, {})
                 .catch(() => undefined);
 
             expect(listener.onBeforeTransaction).not.toHaveBeenCalled();
