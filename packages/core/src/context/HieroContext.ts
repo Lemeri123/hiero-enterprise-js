@@ -30,6 +30,29 @@ function parsePrivateKey(key: string, keyType: string): PrivateKey {
 }
 
 /**
+ * Report a listener error without affecting the outcome.
+ */
+function reportListenerError(
+    hook: keyof TransactionListener,
+    event: TransactionEvent,
+    error: unknown,
+): void {
+    process.emitWarning(
+        `${hook} listener threw for ${event.serviceName}.${event.methodName}: ${describeError(error)}`,
+        { type: "HieroListenerWarning", code: "HIERO_LISTENER_ERROR" },
+    );
+}
+
+/** Stringify a thrown value; listeners may throw values that cannot be. */
+function describeError(error: unknown): string {
+    try {
+        return error instanceof Error ? String(error.message) : String(error);
+    } catch {
+        return "unprintable value";
+    }
+}
+
+/**
  * Central context for interacting with a Hiero network.
  * Manages the SDK Client lifecycle and provides access to the operator account.
  *
@@ -207,13 +230,18 @@ export class HieroContext implements IHieroContext {
     /**
      * Emit a before-transaction event to all registered listeners.
      * Called internally by service clients before executing a transaction.
+     * Never throws: a listener error is reported as a warning and the
+     * remaining listeners still run.
      *
      * @param event - The transaction event
      */
     public async emitBeforeTransaction(event: TransactionEvent): Promise<void> {
         for (const listener of this.listeners) {
-            if (listener.onBeforeTransaction) {
+            if (!listener.onBeforeTransaction) continue;
+            try {
                 await listener.onBeforeTransaction(event);
+            } catch (error) {
+                reportListenerError("onBeforeTransaction", event, error);
             }
         }
     }
@@ -221,13 +249,18 @@ export class HieroContext implements IHieroContext {
     /**
      * Emit an after-transaction event to all registered listeners.
      * Called internally by service clients after a transaction completes.
+     * Never throws: a listener error is reported as a warning and the
+     * remaining listeners still run.
      *
      * @param event - The transaction event (includes result/error/duration)
      */
     public async emitAfterTransaction(event: TransactionEvent): Promise<void> {
         for (const listener of this.listeners) {
-            if (listener.onAfterTransaction) {
+            if (!listener.onAfterTransaction) continue;
+            try {
                 await listener.onAfterTransaction(event);
+            } catch (error) {
+                reportListenerError("onAfterTransaction", event, error);
             }
         }
     }

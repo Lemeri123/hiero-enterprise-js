@@ -292,6 +292,103 @@ describe("HieroContext", () => {
         });
     });
 
+    describe("Listener failures", () => {
+        const event = {
+            type: "AccountCreate",
+            serviceName: "AccountService",
+            methodName: "createAccount",
+            timestamp: new Date(),
+        };
+
+        it("isolates throwing onAfterTransaction listeners and still notifies the rest", async () => {
+            const emitWarning = vi
+                .spyOn(process, "emitWarning")
+                .mockImplementation(() => undefined);
+            try {
+                const ctx = new HieroContext(validConfig);
+                const later = { onAfterTransaction: vi.fn() };
+                ctx.addTransactionListener({
+                    onAfterTransaction: () => {
+                        throw new Error("sync listener bug");
+                    },
+                });
+                ctx.addTransactionListener({
+                    onAfterTransaction: () =>
+                        Promise.reject(new Error("async listener bug")),
+                });
+                ctx.addTransactionListener(later);
+
+                await expect(
+                    ctx.emitAfterTransaction(event),
+                ).resolves.toBeUndefined();
+
+                expect(later.onAfterTransaction).toHaveBeenCalledWith(event);
+                expect(emitWarning).toHaveBeenCalledTimes(2);
+                expect(emitWarning).toHaveBeenCalledWith(
+                    expect.stringContaining(
+                        "AccountService.createAccount: sync listener bug",
+                    ),
+                    expect.objectContaining({ code: "HIERO_LISTENER_ERROR" }),
+                );
+            } finally {
+                emitWarning.mockRestore();
+            }
+        });
+
+        it("still runs later listeners when a listener throws an unprintable value", async () => {
+            const emitWarning = vi
+                .spyOn(process, "emitWarning")
+                .mockImplementation(() => undefined);
+            try {
+                const ctx = new HieroContext(validConfig);
+                const later = { onAfterTransaction: vi.fn() };
+                ctx.addTransactionListener({
+                    onAfterTransaction: () => {
+                        throw Object.create(null);
+                    },
+                });
+                ctx.addTransactionListener(later);
+
+                await expect(
+                    ctx.emitAfterTransaction(event),
+                ).resolves.toBeUndefined();
+                expect(later.onAfterTransaction).toHaveBeenCalledWith(event);
+                expect(emitWarning).toHaveBeenCalledTimes(1);
+            } finally {
+                emitWarning.mockRestore();
+            }
+        });
+
+        it("isolates throwing onBeforeTransaction listeners and still notifies the rest", async () => {
+            const emitWarning = vi
+                .spyOn(process, "emitWarning")
+                .mockImplementation(() => undefined);
+            try {
+                const ctx = new HieroContext(validConfig);
+                const later = { onBeforeTransaction: vi.fn() };
+                ctx.addTransactionListener({
+                    onBeforeTransaction: () => {
+                        throw new Error("metrics backend down");
+                    },
+                });
+                ctx.addTransactionListener(later);
+
+                await expect(
+                    ctx.emitBeforeTransaction(event),
+                ).resolves.toBeUndefined();
+                expect(later.onBeforeTransaction).toHaveBeenCalledWith(event);
+                expect(emitWarning).toHaveBeenCalledWith(
+                    expect.stringContaining(
+                        "onBeforeTransaction listener threw for AccountService.createAccount: metrics backend down",
+                    ),
+                    expect.objectContaining({ code: "HIERO_LISTENER_ERROR" }),
+                );
+            } finally {
+                emitWarning.mockRestore();
+            }
+        });
+    });
+
     describe("SDK Tuning", () => {
         it("applies tuning options from config", () => {
             const ctx = new HieroContext({
