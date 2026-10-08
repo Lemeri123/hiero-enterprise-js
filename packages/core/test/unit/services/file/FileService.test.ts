@@ -101,7 +101,9 @@ describe("FileService [partial content failure]", () => {
             expect(error.message).toContain(
                 "appending the remainder of its contents failed",
             );
-            expect(error.message).toContain("so the file holds partial contents");
+            expect(error.message).toContain(
+                "so the file holds partial contents",
+            );
             expect(error.fileId).toBe(fileId);
             expect(error.transactionId).toBe("0.0.3@9876543210.000");
             expect(error.code).toBe(HieroErrorCodes.SdkError);
