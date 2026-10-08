@@ -1,7 +1,11 @@
 import type { FileId, Key } from "@hiero-ledger/sdk";
 import type { IHieroContext } from "../../context/index.js";
-import { HieroError, HieroErrorCodes } from "../../errors/index.js";
 import type { QueryOptions, ScheduleOptions } from "../transaction/index.js";
+import {
+    HieroError,
+    HieroErrorCodes,
+    normalizeError,
+} from "../../errors/index.js";
 import {
     FileCreateOperation,
     FileAppendOperation,
@@ -178,18 +182,11 @@ export class FileService {
                     contents: tail,
                 });
             } catch (error) {
-                // FileCreate already succeeded on-chain — the caller
-                // needs the fileId to retry the append or delete the
-                // partial file. Surface it on the thrown error.
-                const cause = error as Error;
-                throw new HieroError(
-                    `File ${result.fileId} was created, but appending the remainder of its contents failed: ${cause.message}`,
-                    {
-                        code: HieroErrorCodes.SdkError,
-                        context: "FileService.createFile",
-                        cause,
-                        fileId: result.fileId.toString(),
-                    },
+                throw wrapAppendFailure(
+                    error,
+                    result.fileId,
+                    "FileService.createFile",
+                    "was created",
                 );
             }
         }
@@ -252,11 +249,20 @@ export class FileService {
         });
 
         if (tail !== null) {
-            await this.appendOperation.execute({
-                ...options,
-                fileId: options.fileId,
-                contents: tail,
-            });
+            try {
+                await this.appendOperation.execute({
+                    ...options,
+                    fileId: options.fileId,
+                    contents: tail,
+                });
+            } catch (error) {
+                throw wrapAppendFailure(
+                    error,
+                    options.fileId,
+                    "FileService.updateFile",
+                    "was updated",
+                );
+            }
         }
         return result;
     }
@@ -385,4 +391,38 @@ function splitContents(
         contents.subarray(0, MAX_FILE_TX_BYTES),
         contents.subarray(MAX_FILE_TX_BYTES),
     ];
+}
+
+/**
+ * Wrap an append failure into a HieroError that carries the fileId and
+ * makes clear that the initial create/update succeeded but subsequent
+ * append failed, leaving the file with partial contents.
+ *
+ * @param error - The raw append error
+ * @param fileId - The file entity ID
+ * @param context - Operation context (e.g., "FileService.createFile")
+ * @param actionVerb - Past tense action verb (e.g., "was created", "was updated")
+ * @returns A HieroError with fileId attached
+ */
+function wrapAppendFailure(
+    error: unknown,
+    fileId: FileId | string,
+    context: string,
+    actionVerb: string,
+): HieroError {
+    const normalized = normalizeError(error, context);
+    const fileIdStr =
+        typeof fileId === "string" ? fileId : fileId.toString();
+
+    return new HieroError(
+        `File ${fileIdStr} ${actionVerb}, but appending the remainder of its contents failed: ${normalized.message}`,
+        {
+            code: normalized.code,
+            sdkStatus: normalized.sdkStatus,
+            context,
+            cause: normalized.cause ?? normalized,
+            transactionId: normalized.transactionId,
+            fileId: fileIdStr,
+        },
+    );
 }

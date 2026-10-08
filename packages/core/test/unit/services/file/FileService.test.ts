@@ -1,0 +1,178 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { FileService } from "../../../../src/services/file/index.js";
+import { HieroError, HieroErrorCodes } from "../../../../src/errors/index.js";
+import { createMockContext } from "../../../utils/mock-context.js";
+import type { IHieroContext } from "../../../../src/context/index.js";
+
+describe("FileService [partial content failure]", () => {
+    let context: IHieroContext;
+    let service: FileService;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        context = createMockContext();
+        service = new FileService(context);
+    });
+
+    describe("createFile with large contents", () => {
+        it("wraps append failure in HieroError with fileId when create succeeds but append fails", async () => {
+            // Create > 4 KiB payload to trigger split
+            const largeContents = Buffer.alloc(5000, "x");
+
+            // Mock createOperation to succeed and return a fileId
+            const mockFileId = { toString: () => "0.0.12345" };
+            vi.spyOn(
+                service["createOperation"],
+                "execute",
+            ).mockResolvedValueOnce({
+                fileId: mockFileId,
+                status: "SUCCESS",
+            } as any);
+
+            // Mock appendOperation to fail
+            const appendError = new Error("Missing required signatures");
+            vi.spyOn(service["appendOperation"], "execute").mockRejectedValueOnce(
+                appendError,
+            );
+
+            const error = await service
+                .createFile({ contents: largeContents })
+                .catch((e) => e);
+
+            expect(error).toBeInstanceOf(HieroError);
+            expect(error.message).toContain("0.0.12345");
+            expect(error.message).toContain("was created");
+            expect(error.message).toContain(
+                "appending the remainder of its contents failed",
+            );
+            expect(error.fileId).toBe("0.0.12345");
+            expect(error.code).toBe(HieroErrorCodes.SdkError);
+            expect(error.context).toBe("FileService.createFile");
+        });
+
+        it("does not wrap error when contents fit in single transaction", async () => {
+            const smallContents = Buffer.alloc(100, "x");
+
+            const mockFileId = { toString: () => "0.0.12346" };
+            
+            // Set up spies before calling the method
+            const appendSpy = vi.spyOn(service["appendOperation"], "execute");
+            vi.spyOn(
+                service["createOperation"],
+                "execute",
+            ).mockResolvedValueOnce({
+                fileId: mockFileId,
+                status: "SUCCESS",
+            } as any);
+
+            const result = await service.createFile({ contents: smallContents });
+
+            expect(result.fileId).toBe(mockFileId);
+            // Append should not be called for small contents
+            expect(appendSpy).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("updateFile with large contents", () => {
+        it("wraps append failure in HieroError with fileId when update succeeds but append fails", async () => {
+            const largeContents = Buffer.alloc(5000, "y");
+            const fileId = "0.0.67890";
+
+            // Mock updateOperation to succeed
+            vi.spyOn(
+                service["updateOperation"],
+                "execute",
+            ).mockResolvedValueOnce({
+                status: "SUCCESS",
+            } as any);
+
+            // Mock appendOperation to fail
+            const appendError = new Error("Insufficient transaction fee");
+            vi.spyOn(service["appendOperation"], "execute").mockRejectedValueOnce(
+                appendError,
+            );
+
+            const error = await service
+                .updateFile({ fileId, contents: largeContents })
+                .catch((e) => e);
+
+            expect(error).toBeInstanceOf(HieroError);
+            expect(error.message).toContain(fileId);
+            expect(error.message).toContain("was updated");
+            expect(error.message).toContain(
+                "appending the remainder of its contents failed",
+            );
+            expect(error.fileId).toBe(fileId);
+            expect(error.code).toBe(HieroErrorCodes.SdkError);
+            expect(error.context).toBe("FileService.updateFile");
+        });
+
+        it("does not wrap error when contents fit in single transaction", async () => {
+            const smallContents = Buffer.alloc(100, "y");
+            const fileId = "0.0.67891";
+
+            // Set up spies before calling the method
+            const appendSpy = vi.spyOn(service["appendOperation"], "execute");
+            vi.spyOn(
+                service["updateOperation"],
+                "execute",
+            ).mockResolvedValueOnce({
+                status: "SUCCESS",
+            } as any);
+
+            await service.updateFile({ fileId, contents: smallContents });
+
+            // Append should not be called for small contents
+            expect(appendSpy).not.toHaveBeenCalled();
+        });
+
+        it("does not attempt append when contents is undefined", async () => {
+            const fileId = "0.0.67892";
+
+            // Set up spies before calling the method
+            const appendSpy = vi.spyOn(service["appendOperation"], "execute");
+            vi.spyOn(
+                service["updateOperation"],
+                "execute",
+            ).mockResolvedValueOnce({
+                status: "SUCCESS",
+            } as any);
+
+            await service.updateFile({ fileId, fileMemo: "updated memo" });
+
+            expect(appendSpy).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("error normalization", () => {
+        it("preserves existing HieroError properties when wrapping append failure", async () => {
+            const largeContents = Buffer.alloc(5000, "z");
+            const fileId = "0.0.99999";
+
+            vi.spyOn(
+                service["updateOperation"],
+                "execute",
+            ).mockResolvedValueOnce({
+                status: "SUCCESS",
+            } as any);
+
+            // Simulate SDK ReceiptStatusError with transactionId
+            const sdkError = new Error("INVALID_SIGNATURE") as any;
+            sdkError.status = { toString: () => "INVALID_SIGNATURE" };
+            sdkError.transactionId = { toString: () => "0.0.2@1234567890.000" };
+
+            vi.spyOn(service["appendOperation"], "execute").mockRejectedValueOnce(
+                sdkError,
+            );
+
+            await expect(
+                service.updateFile({ fileId, contents: largeContents }),
+            ).rejects.toMatchObject({
+                fileId,
+                sdkStatus: "INVALID_SIGNATURE",
+                transactionId: "0.0.2@1234567890.000",
+                code: HieroErrorCodes.SdkError,
+            });
+        });
+    });
+});
