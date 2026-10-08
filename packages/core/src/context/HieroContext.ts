@@ -144,9 +144,7 @@ export class HieroContext implements IHieroContext {
         this.client.setOperator(this.operatorAccountId, this._operatorKey);
 
         // Apply SDK client tuning options
-        if (resolved.requestTimeoutMs !== undefined) {
-            this.client.setRequestTimeout(resolved.requestTimeoutMs);
-        }
+        this.applyTimeouts(resolved.requestTimeoutMs, resolved.grpcDeadlineMs);
         if (resolved.maxAttempts !== undefined) {
             this.client.setMaxAttempts(resolved.maxAttempts);
         }
@@ -155,6 +153,30 @@ export class HieroContext implements IHieroContext {
         }
         if (resolved.maxBackoffMs !== undefined) {
             this.client.setMaxBackoff(resolved.maxBackoffMs);
+        }
+    }
+
+    /**
+     * The SDK warns when the gRPC deadline is not below the request timeout,
+     * checking against the other value's current setting, so apply them in
+     * the order that keeps a valid pair from warning.
+     */
+    private applyTimeouts(
+        requestTimeoutMs: number | undefined,
+        grpcDeadlineMs: number | undefined,
+    ): void {
+        const deadlineFirst =
+            grpcDeadlineMs !== undefined &&
+            grpcDeadlineMs < this.client.requestTimeout;
+
+        if (deadlineFirst) {
+            this.client.setGrpcDeadline(grpcDeadlineMs);
+        }
+        if (requestTimeoutMs !== undefined) {
+            this.client.setRequestTimeout(requestTimeoutMs);
+        }
+        if (!deadlineFirst && grpcDeadlineMs !== undefined) {
+            this.client.setGrpcDeadline(grpcDeadlineMs);
         }
     }
 
