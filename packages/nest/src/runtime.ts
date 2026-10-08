@@ -17,8 +17,13 @@ import {
     createMirrorNodeClient,
     createMirrorRepositories,
 } from "@hiero-hackers/enterprise-mirror";
+import { warnDeprecated } from "./deprecation.js";
 
 /**
+ * @deprecated The framework adapters are deprecated. Compose
+ * `HieroConfig` from `@hiero-hackers/enterprise-core` and `MirrorConfig`
+ * from `@hiero-hackers/enterprise-mirror` directly.
+ *
  * Combined configuration for a full Hiero integration: the SDK/consensus
  * side (`HieroConfig`) plus the mirror node REST side (`MirrorConfig`).
  * The shape is flat, matching the pre-split config exactly.
@@ -26,6 +31,10 @@ import {
 export type HieroAdapterConfig = HieroConfig & MirrorConfig;
 
 /**
+ * @deprecated The framework adapters are deprecated. Create the services
+ * you need from `@hiero-hackers/enterprise-core` and
+ * `@hiero-hackers/enterprise-mirror` directly.
+ *
  * All services made available through the framework integration —
  * write-side services from `@hiero-hackers/enterprise-core`, plus every read-side
  * repository from `@hiero-hackers/enterprise-mirror` (one property per
@@ -42,6 +51,11 @@ export interface HieroServices extends MirrorRepositories {
     topicService: TopicService;
 }
 
+/**
+ * @deprecated The framework adapters are deprecated. Create the services
+ * you need from `@hiero-hackers/enterprise-core` and
+ * `@hiero-hackers/enterprise-mirror` directly.
+ */
 export interface HieroRuntime extends HieroServices {
     mirrorNodeClient: MirrorNodeClient;
     close(): void;
@@ -50,8 +64,13 @@ export interface HieroRuntime extends HieroServices {
 /**
  * Compose the full Hiero runtime graph from core + mirror. Config falls
  * back to environment variables when omitted.
+ *
+ * @deprecated The framework adapters are deprecated. Create a
+ * `HieroContext` and mirror repositories directly — see the migration
+ * guide in the repository README.
  */
 export function createHieroRuntime(config?: HieroAdapterConfig): HieroRuntime {
+    warnDeprecated();
     const context = new HieroContext(config);
     // When config is omitted, the mirror side resolves from the same
     // HIERO_* environment variables the context used.

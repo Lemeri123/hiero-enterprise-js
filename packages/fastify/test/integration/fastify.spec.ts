@@ -1,6 +1,7 @@
 import Fastify from "fastify";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { hieroPlugin } from "../../src/index.js";
+import { DEPRECATION_CODE } from "../../src/deprecation.js";
 
 const config = {
     network: "testnet",
@@ -34,5 +35,29 @@ describe("hieroPlugin", () => {
         expect(payload.hasNetworkRepository).toBe(true);
 
         await app.close();
+    });
+});
+
+describe("deprecation", () => {
+    it("emits a single DeprecationWarning however many runtimes are created", async () => {
+        vi.resetModules();
+        const emitWarning = vi
+            .spyOn(process, "emitWarning")
+            .mockImplementation(() => undefined);
+        try {
+            const { createHieroRuntime } = await import("../../src/runtime.js");
+            createHieroRuntime(config).close();
+            createHieroRuntime(config).close();
+
+            const ours = emitWarning.mock.calls.filter(
+                ([, options]) =>
+                    (options as { code?: string } | undefined)?.code ===
+                    DEPRECATION_CODE,
+            );
+            expect(ours).toHaveLength(1);
+            expect(ours[0]![1]).toMatchObject({ type: "DeprecationWarning" });
+        } finally {
+            emitWarning.mockRestore();
+        }
     });
 });
