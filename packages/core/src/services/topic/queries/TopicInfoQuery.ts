@@ -76,28 +76,31 @@ export class TopicInfoQuery {
         topicId: string | TopicId,
         options: QueryOptions = {},
     ): Promise<TopicInfoResult> {
-        const info = await this.executor.run(
+        return await this.executor.run(
             () => new SdkTopicInfoQuery().setTopicId(topicId),
             options,
             "TopicService.getTopicInfo",
+            (info) => {
+                return {
+                    topicId: info.topicId.toString(),
+                    topicMemo: info.topicMemo,
+                    runningHash: info.runningHash,
+                    sequenceNumber: info.sequenceNumber.toString(),
+                    expirationTime: info.expirationTime
+                        ? info.expirationTime.toDate().toISOString()
+                        : null,
+                    adminKey: info.adminKey,
+                    submitKey: info.submitKey,
+                    feeScheduleKey: info.feeScheduleKey,
+                    feeExemptKeys: info.feeExemptKeys,
+                    autoRenewPeriod:
+                        info.autoRenewPeriod?.seconds.toNumber() ?? null,
+                    autoRenewAccountId:
+                        info.autoRenewAccountId?.toString() ?? null,
+                    customFees: info.customFees,
+                    ledgerId: info.ledgerId?.toString() ?? null,
+                };
+            },
         );
-
-        return {
-            topicId: info.topicId.toString(),
-            topicMemo: info.topicMemo,
-            runningHash: info.runningHash,
-            sequenceNumber: info.sequenceNumber.toString(),
-            expirationTime: info.expirationTime
-                ? info.expirationTime.toDate().toISOString()
-                : null,
-            adminKey: info.adminKey,
-            submitKey: info.submitKey,
-            feeScheduleKey: info.feeScheduleKey,
-            feeExemptKeys: info.feeExemptKeys,
-            autoRenewPeriod: info.autoRenewPeriod?.seconds.toNumber() ?? null,
-            autoRenewAccountId: info.autoRenewAccountId?.toString() ?? null,
-            customFees: info.customFees,
-            ledgerId: info.ledgerId?.toString() ?? null,
-        };
     }
 }

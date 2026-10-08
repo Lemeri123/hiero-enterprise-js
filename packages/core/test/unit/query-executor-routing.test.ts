@@ -150,6 +150,52 @@ describe("query routing through QueryExecutor", () => {
         ctx.close();
     });
 
+    // A response the result mapping can't convert must still surface as a
+    // HieroError with the method's context.
+    it.each([
+        [
+            "AccountService.getAccountBalance",
+            {},
+            (c: HieroContext) =>
+                new AccountService(c).getAccountBalance("0.0.98"),
+        ],
+        [
+            "FileService.getFileInfo",
+            {},
+            (c: HieroContext) => new FileService(c).getFileInfo("0.0.150"),
+        ],
+        [
+            "ScheduleService.getInfo",
+            {},
+            (c: HieroContext) => new ScheduleService(c).getInfo("0.0.7"),
+        ],
+        [
+            "TokenService.getTokenInfo",
+            {},
+            (c: HieroContext) => new TokenService(c).getTokenInfo("0.0.6"),
+        ],
+        [
+            "TokenService.getNftInfo",
+            [{}],
+            (c: HieroContext) => new TokenService(c).getNftInfo("0.0.6/1"),
+        ],
+        [
+            "TopicService.getTopicInfo",
+            {},
+            (c: HieroContext) => new TopicService(c).getTopicInfo("0.0.8"),
+        ],
+    ] as const)(
+        "reports a malformed response as a HieroError (%s)",
+        async (errorContext, response, call) => {
+            execute.mockResolvedValueOnce(response);
+
+            const error = await call(ctx).catch((e: unknown) => e);
+
+            expect(error).toBeInstanceOf(HieroError);
+            expect(error).toMatchObject({ context: errorContext });
+        },
+    );
+
     it("reports an invalid ID as a HieroError without reaching the network", async () => {
         const error = await new AccountService(ctx)
             .getAccountBalance("not-an-id")

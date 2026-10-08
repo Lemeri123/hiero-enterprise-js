@@ -64,32 +64,33 @@ export class TokenNftInfoQuery {
         nftId: string | NftId,
         options: QueryOptions = {},
     ): Promise<TokenNftInfoResult> {
-        const infos = await this.executor.run(
+        return await this.executor.run(
             () => new SdkTokenNftInfoQuery().setNftId(nftId),
             options,
             "TokenService.getNftInfo",
+            (infos) => {
+                const info = infos[0];
+                if (info == null) {
+                    throw new HieroError(
+                        `No NFT info returned for ${nftId.toString()}`,
+                        {
+                            code: HieroErrorCodes.NotFound,
+                            context: "TokenService.getNftInfo",
+                        },
+                    );
+                }
+
+                return {
+                    nftId: info.nftId.toString(),
+                    tokenId: info.nftId.tokenId.toString(),
+                    serial: info.nftId.serial.toString(),
+                    accountId: info.accountId.toString(),
+                    creationTime: info.creationTime.toDate().toISOString(),
+                    metadata: info.metadata,
+                    spenderId: info.spenderId?.toString() ?? null,
+                    ledgerId: info.ledgerId?.toString() ?? null,
+                };
+            },
         );
-
-        const info = infos[0];
-        if (info == null) {
-            throw new HieroError(
-                `No NFT info returned for ${nftId.toString()}`,
-                {
-                    code: HieroErrorCodes.NotFound,
-                    context: "TokenService.getNftInfo",
-                },
-            );
-        }
-
-        return {
-            nftId: info.nftId.toString(),
-            tokenId: info.nftId.tokenId.toString(),
-            serial: info.nftId.serial.toString(),
-            accountId: info.accountId.toString(),
-            creationTime: info.creationTime.toDate().toISOString(),
-            metadata: info.metadata,
-            spenderId: info.spenderId?.toString() ?? null,
-            ledgerId: info.ledgerId?.toString() ?? null,
-        };
     }
 }

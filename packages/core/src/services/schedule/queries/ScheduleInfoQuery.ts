@@ -66,37 +66,38 @@ export class ScheduleInfoQuery {
         scheduleId: string | ScheduleId,
         options: QueryOptions = {},
     ): Promise<ScheduleInfoResult> {
-        const info = await this.executor.run(
+        return await this.executor.run(
             () => new SdkScheduleInfoQuery().setScheduleId(scheduleId),
             options,
             "ScheduleService.getInfo",
+            (info) => {
+                const isExecuted = info.executed !== null;
+                const isDeleted = info.deleted !== null;
+
+                return {
+                    scheduleId: info.scheduleId.toString(),
+                    creatorAccountId: info.creatorAccountId?.toString() ?? null,
+                    payerAccountId: info.payerAccountId?.toString() ?? null,
+                    scheduleMemo: info.scheduleMemo,
+                    isExecuted,
+                    isDeleted,
+                    isPending: !isExecuted && !isDeleted,
+                    executedAt: info.executed
+                        ? info.executed.toDate().toISOString()
+                        : null,
+                    deletedAt: info.deleted
+                        ? info.deleted.toDate().toISOString()
+                        : null,
+                    expiresAt: info.expirationTime
+                        ? info.expirationTime.toDate().toISOString()
+                        : null,
+                    scheduledTransactionId:
+                        info.scheduledTransactionId?.toString() ?? null,
+                    // signers is a KeyList — toArray() gives the individual keys
+                    signerCount: info.signers?.toArray().length ?? 0,
+                    waitForExpiry: info.waitForExpiry,
+                };
+            },
         );
-
-        const isExecuted = info.executed !== null;
-        const isDeleted = info.deleted !== null;
-
-        return {
-            scheduleId: info.scheduleId.toString(),
-            creatorAccountId: info.creatorAccountId?.toString() ?? null,
-            payerAccountId: info.payerAccountId?.toString() ?? null,
-            scheduleMemo: info.scheduleMemo,
-            isExecuted,
-            isDeleted,
-            isPending: !isExecuted && !isDeleted,
-            executedAt: info.executed
-                ? info.executed.toDate().toISOString()
-                : null,
-            deletedAt: info.deleted
-                ? info.deleted.toDate().toISOString()
-                : null,
-            expiresAt: info.expirationTime
-                ? info.expirationTime.toDate().toISOString()
-                : null,
-            scheduledTransactionId:
-                info.scheduledTransactionId?.toString() ?? null,
-            // signers is a KeyList — toArray() gives the individual keys
-            signerCount: info.signers?.toArray().length ?? 0,
-            waitForExpiry: info.waitForExpiry,
-        };
     }
 }

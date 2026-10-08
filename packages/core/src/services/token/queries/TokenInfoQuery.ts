@@ -128,43 +128,47 @@ export class TokenInfoQuery {
         tokenId: string | TokenId,
         options: QueryOptions = {},
     ): Promise<TokenInfoResult> {
-        const info = await this.executor.run(
+        return await this.executor.run(
             () => new SdkTokenInfoQuery().setTokenId(tokenId),
             options,
             "TokenService.getTokenInfo",
+            (info) => {
+                return {
+                    tokenId: info.tokenId.toString(),
+                    name: info.name,
+                    symbol: info.symbol,
+                    decimals: info.decimals,
+                    totalSupply: info.totalSupply.toString(),
+                    treasuryAccountId:
+                        info.treasuryAccountId?.toString() ?? null,
+                    adminKey: info.adminKey,
+                    kycKey: info.kycKey,
+                    freezeKey: info.freezeKey,
+                    pauseKey: info.pauseKey,
+                    wipeKey: info.wipeKey,
+                    supplyKey: info.supplyKey,
+                    feeScheduleKey: info.feeScheduleKey,
+                    metadataKey: info.metadataKey,
+                    defaultFreezeStatus: info.defaultFreezeStatus,
+                    defaultKycStatus: info.defaultKycStatus,
+                    pauseStatus: info.pauseStatus,
+                    isDeleted: info.isDeleted,
+                    autoRenewAccountId:
+                        info.autoRenewAccountId?.toString() ?? null,
+                    autoRenewPeriod:
+                        info.autoRenewPeriod?.seconds.toNumber() ?? null,
+                    expirationTime: info.expirationTime
+                        ? info.expirationTime.toDate().toISOString()
+                        : null,
+                    tokenMemo: info.tokenMemo,
+                    customFees: info.customFees,
+                    tokenType: info.tokenType,
+                    supplyType: info.supplyType,
+                    maxSupply: info.maxSupply?.toString() ?? null,
+                    ledgerId: info.ledgerId?.toString() ?? null,
+                    metadata: info.metadata,
+                };
+            },
         );
-
-        return {
-            tokenId: info.tokenId.toString(),
-            name: info.name,
-            symbol: info.symbol,
-            decimals: info.decimals,
-            totalSupply: info.totalSupply.toString(),
-            treasuryAccountId: info.treasuryAccountId?.toString() ?? null,
-            adminKey: info.adminKey,
-            kycKey: info.kycKey,
-            freezeKey: info.freezeKey,
-            pauseKey: info.pauseKey,
-            wipeKey: info.wipeKey,
-            supplyKey: info.supplyKey,
-            feeScheduleKey: info.feeScheduleKey,
-            metadataKey: info.metadataKey,
-            defaultFreezeStatus: info.defaultFreezeStatus,
-            defaultKycStatus: info.defaultKycStatus,
-            pauseStatus: info.pauseStatus,
-            isDeleted: info.isDeleted,
-            autoRenewAccountId: info.autoRenewAccountId?.toString() ?? null,
-            autoRenewPeriod: info.autoRenewPeriod?.seconds.toNumber() ?? null,
-            expirationTime: info.expirationTime
-                ? info.expirationTime.toDate().toISOString()
-                : null,
-            tokenMemo: info.tokenMemo,
-            customFees: info.customFees,
-            tokenType: info.tokenType,
-            supplyType: info.supplyType,
-            maxSupply: info.maxSupply?.toString() ?? null,
-            ledgerId: info.ledgerId?.toString() ?? null,
-            metadata: info.metadata,
-        };
     }
 }

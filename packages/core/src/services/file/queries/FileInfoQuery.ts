@@ -67,22 +67,23 @@ export class FileInfoQuery {
         fileId: string | FileId,
         options: QueryOptions = {},
     ): Promise<FileInfoResult> {
-        const info = await this.executor.run(
+        return await this.executor.run(
             () => new SdkFileInfoQuery().setFileId(fileId),
             options,
             "FileService.getFileInfo",
+            (info) => {
+                return {
+                    fileId: info.fileId.toString(),
+                    size: info.size.toNumber(),
+                    expirationTime: info.expirationTime
+                        ? info.expirationTime.toDate().toISOString()
+                        : null,
+                    isDeleted: info.isDeleted,
+                    keys: info.keys ?? null,
+                    fileMemo: info.fileMemo,
+                    ledgerId: info.ledgerId?.toString() ?? null,
+                };
+            },
         );
-
-        return {
-            fileId: info.fileId.toString(),
-            size: info.size.toNumber(),
-            expirationTime: info.expirationTime
-                ? info.expirationTime.toDate().toISOString()
-                : null,
-            isDeleted: info.isDeleted,
-            keys: info.keys ?? null,
-            fileMemo: info.fileMemo,
-            ledgerId: info.ledgerId?.toString() ?? null,
-        };
     }
 }

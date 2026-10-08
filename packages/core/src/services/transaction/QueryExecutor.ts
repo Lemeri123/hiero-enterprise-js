@@ -16,24 +16,38 @@ export class QueryExecutor {
     constructor(private readonly context: IHieroContext) {}
 
     /**
-     * Build and execute a query.
+     * Build and execute a query, optionally mapping its result.
      *
      * @param build - The query, or a function that builds it. Pass a
      *   function so invalid input (e.g. a malformed ID) is reported as a
      *   `HieroError` like any other failure.
      * @param options - Base query options (payer, payment caps, node targeting).
      * @param errorContext - `Service.method` recorded on a thrown `HieroError`.
-     * @returns The query result, typed by the query's response type.
+     * @param map - Converts the SDK result; its errors are normalised too.
+     * @returns The query result, or the mapped result when `map` is given.
      */
     async run<TResult>(
         build: Query<TResult> | (() => Query<TResult>),
         options: QueryOptions,
         errorContext: string,
-    ): Promise<TResult> {
+    ): Promise<TResult>;
+    async run<TResult, TMapped>(
+        build: Query<TResult> | (() => Query<TResult>),
+        options: QueryOptions,
+        errorContext: string,
+        map: (result: TResult) => TMapped,
+    ): Promise<TMapped>;
+    async run<TResult, TMapped>(
+        build: Query<TResult> | (() => Query<TResult>),
+        options: QueryOptions,
+        errorContext: string,
+        map?: (result: TResult) => TMapped,
+    ): Promise<TResult | TMapped> {
         try {
             const query = typeof build === "function" ? build() : build;
             this.applyBaseOptions(query, options);
-            return await query.execute(this.context.client);
+            const result = await query.execute(this.context.client);
+            return map ? map(result) : result;
         } catch (error) {
             throw normalizeError(error, errorContext);
         }

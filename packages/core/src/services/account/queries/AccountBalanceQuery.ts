@@ -17,27 +17,28 @@ export class AccountBalanceQuery {
         accountId: string | AccountId,
         options: QueryOptions = {},
     ): Promise<Balance> {
-        const balance = await this.executor.run(
+        return await this.executor.run(
             () => new SdkAccountBalanceQuery().setAccountId(accountId),
             options,
             "AccountService.getAccountBalance",
+            (balance) => {
+                const tokens = [];
+                if (balance.tokens) {
+                    for (const [tokenId, amount] of balance.tokens) {
+                        tokens.push({
+                            tokenId: tokenId.toString(),
+                            balance: amount.toString(),
+                            decimals: balance.tokenDecimals?.get(tokenId) ?? 0,
+                        });
+                    }
+                }
+
+                return {
+                    accountId: accountId.toString(),
+                    tinybars: balance.hbars.toTinybars().toString(),
+                    tokens,
+                };
+            },
         );
-
-        const tokens = [];
-        if (balance.tokens) {
-            for (const [tokenId, amount] of balance.tokens) {
-                tokens.push({
-                    tokenId: tokenId.toString(),
-                    balance: amount.toString(),
-                    decimals: balance.tokenDecimals?.get(tokenId) ?? 0,
-                });
-            }
-        }
-
-        return {
-            accountId: accountId.toString(),
-            tinybars: balance.hbars.toTinybars().toString(),
-            tokens,
-        };
     }
 }
