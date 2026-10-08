@@ -4,8 +4,6 @@ import { HieroError, HieroErrorCodes } from "../../../../src/errors/index.js";
 import { createMockContext } from "../../../utils/mock-context.js";
 import type { IHieroContext } from "../../../../src/context/index.js";
 
-/* eslint-disable @typescript-eslint/no-explicit-any -- Test mocks require flexible typing */
-
 describe("FileService [partial content failure]", () => {
     let context: IHieroContext;
     let service: FileService;
@@ -28,7 +26,7 @@ describe("FileService [partial content failure]", () => {
             ).mockResolvedValueOnce({
                 fileId: mockFileId,
                 status: "SUCCESS",
-            } as any);
+            } as never);
 
             const appendError = new Error("Missing required signatures");
             vi.spyOn(
@@ -63,7 +61,7 @@ describe("FileService [partial content failure]", () => {
             ).mockResolvedValueOnce({
                 fileId: mockFileId,
                 status: "SUCCESS",
-            } as any);
+            } as never);
 
             const result = await service.createFile({
                 contents: smallContents,
@@ -84,7 +82,8 @@ describe("FileService [partial content failure]", () => {
                 "execute",
             ).mockResolvedValueOnce({
                 status: "SUCCESS",
-            } as any);
+                transactionId: "0.0.3@9876543210.000",
+            } as never);
 
             const appendError = new Error("Insufficient transaction fee");
             vi.spyOn(
@@ -102,7 +101,9 @@ describe("FileService [partial content failure]", () => {
             expect(error.message).toContain(
                 "appending the remainder of its contents failed",
             );
+            expect(error.message).toContain("so the file holds partial contents");
             expect(error.fileId).toBe(fileId);
+            expect(error.transactionId).toBe("0.0.3@9876543210.000");
             expect(error.code).toBe(HieroErrorCodes.SdkError);
             expect(error.context).toBe("FileService.updateFile");
         });
@@ -117,7 +118,7 @@ describe("FileService [partial content failure]", () => {
                 "execute",
             ).mockResolvedValueOnce({
                 status: "SUCCESS",
-            } as any);
+            } as never);
 
             await service.updateFile({ fileId, contents: smallContents });
 
@@ -133,7 +134,7 @@ describe("FileService [partial content failure]", () => {
                 "execute",
             ).mockResolvedValueOnce({
                 status: "SUCCESS",
-            } as any);
+            } as never);
 
             await service.updateFile({ fileId, fileMemo: "updated memo" });
 
@@ -151,11 +152,16 @@ describe("FileService [partial content failure]", () => {
                 "execute",
             ).mockResolvedValueOnce({
                 status: "SUCCESS",
-            } as any);
+                transactionId: "0.0.3@5555555555.000",
+            } as never);
 
-            const sdkError = new Error("INVALID_SIGNATURE") as any;
-            sdkError.status = { toString: () => "INVALID_SIGNATURE" };
-            sdkError.transactionId = { toString: () => "0.0.2@1234567890.000" };
+            const sdkError = new Error("INVALID_SIGNATURE") as never;
+            (sdkError as never as Record<string, unknown>).status = {
+                toString: () => "INVALID_SIGNATURE",
+            };
+            (sdkError as never as Record<string, unknown>).transactionId = {
+                toString: () => "0.0.2@1234567890.000",
+            };
 
             vi.spyOn(
                 service["appendOperation"],
@@ -167,7 +173,7 @@ describe("FileService [partial content failure]", () => {
             ).rejects.toMatchObject({
                 fileId,
                 sdkStatus: "INVALID_SIGNATURE",
-                transactionId: "0.0.2@1234567890.000",
+                transactionId: "0.0.3@5555555555.000",
                 code: HieroErrorCodes.SdkError,
             });
         });

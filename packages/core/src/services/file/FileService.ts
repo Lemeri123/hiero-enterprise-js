@@ -185,6 +185,7 @@ export class FileService {
                 throw wrapAppendFailure(
                     error,
                     result.fileId,
+                    result.transactionId,
                     "FileService.createFile",
                     "was created",
                 );
@@ -259,6 +260,7 @@ export class FileService {
                 throw wrapAppendFailure(
                     error,
                     options.fileId,
+                    result.transactionId,
                     "FileService.updateFile",
                     "was updated",
                 );
@@ -400,6 +402,7 @@ function splitContents(
  *
  * @param error - The raw append error
  * @param fileId - The file entity ID
+ * @param transactionId - Transaction ID from the create/update that succeeded
  * @param context - Operation context (e.g., "FileService.createFile")
  * @param actionVerb - Past tense action verb (e.g., "was created", "was updated")
  * @returns A HieroError with fileId attached
@@ -407,21 +410,24 @@ function splitContents(
 function wrapAppendFailure(
     error: unknown,
     fileId: FileId | string,
+    transactionId: string,
     context: string,
     actionVerb: string,
 ): HieroError {
     const normalized = normalizeError(error, context);
     const fileIdStr = typeof fileId === "string" ? fileId : fileId.toString();
 
-    return new HieroError(
-        `File ${fileIdStr} ${actionVerb}, but appending the remainder of its contents failed: ${normalized.message}`,
-        {
-            code: normalized.code,
-            sdkStatus: normalized.sdkStatus,
-            context,
-            cause: normalized.cause ?? normalized,
-            transactionId: normalized.transactionId,
-            fileId: fileIdStr,
-        },
-    );
+    const isUpdate = context === "FileService.updateFile";
+    const partialMessage = isUpdate
+        ? `File ${fileIdStr} ${actionVerb}, but appending the remainder of its contents failed, so the file holds partial contents: ${normalized.message}`
+        : `File ${fileIdStr} ${actionVerb}, but appending the remainder of its contents failed: ${normalized.message}`;
+
+    return new HieroError(partialMessage, {
+        code: normalized.code,
+        sdkStatus: normalized.sdkStatus,
+        context,
+        cause: normalized.cause ?? normalized,
+        transactionId,
+        fileId: fileIdStr,
+    });
 }
