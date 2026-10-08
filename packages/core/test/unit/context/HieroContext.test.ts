@@ -292,6 +292,63 @@ describe("HieroContext", () => {
         });
     });
 
+    describe("Listener failures", () => {
+        const event = {
+            type: "AccountCreate",
+            serviceName: "AccountService",
+            methodName: "createAccount",
+            timestamp: new Date(),
+        };
+
+        it("isolates throwing onAfterTransaction listeners and still notifies the rest", async () => {
+            const emitWarning = vi
+                .spyOn(process, "emitWarning")
+                .mockImplementation(() => undefined);
+            try {
+                const ctx = new HieroContext(validConfig);
+                const later = { onAfterTransaction: vi.fn() };
+                ctx.addTransactionListener({
+                    onAfterTransaction: () => {
+                        throw new Error("sync listener bug");
+                    },
+                });
+                ctx.addTransactionListener({
+                    onAfterTransaction: () =>
+                        Promise.reject(new Error("async listener bug")),
+                });
+                ctx.addTransactionListener(later);
+
+                await expect(
+                    ctx.emitAfterTransaction(event),
+                ).resolves.toBeUndefined();
+
+                expect(later.onAfterTransaction).toHaveBeenCalledWith(event);
+                expect(emitWarning).toHaveBeenCalledTimes(2);
+                expect(emitWarning).toHaveBeenCalledWith(
+                    expect.stringContaining(
+                        "AccountService.createAccount: sync listener bug",
+                    ),
+                    expect.objectContaining({ code: "HIERO_LISTENER_ERROR" }),
+                );
+            } finally {
+                emitWarning.mockRestore();
+            }
+        });
+
+        it("propagates a throwing onBeforeTransaction listener so it can veto the transaction", async () => {
+            const ctx = new HieroContext(validConfig);
+            ctx.addTransactionListener({
+                onBeforeTransaction: () => {
+                    throw new Error("blocked by policy");
+                },
+            });
+
+            await expect(ctx.emitBeforeTransaction(event)).rejects.toThrow(
+                "blocked by policy",
+            );
+        });
+    });
+
     describe("SDK Tuning", () => {
         it("applies tuning options from config", () => {
             const ctx = new HieroContext({

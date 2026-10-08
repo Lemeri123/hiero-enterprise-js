@@ -43,8 +43,15 @@ export interface TransactionEvent {
  * ```
  */
 export interface TransactionListener {
-    /** Called before a transaction is submitted to the network */
+    /**
+     * Called before a transaction is submitted to the network.
+     * Throwing aborts the transaction.
+     */
     onBeforeTransaction?(event: TransactionEvent): void | Promise<void>;
-    /** Called after a transaction completes (success or failure) */
+    /**
+     * Called after a transaction completes (success or failure).
+     * Throwing does not change the outcome; the error is reported as a
+     * `HIERO_LISTENER_ERROR` process warning.
+     */
     onAfterTransaction?(event: TransactionEvent): void | Promise<void>;
 }

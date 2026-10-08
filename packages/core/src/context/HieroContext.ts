@@ -30,6 +30,17 @@ function parsePrivateKey(key: string, keyType: string): PrivateKey {
 }
 
 /**
+ * Report an `onAfterTransaction` error without affecting the outcome.
+ */
+function reportListenerError(event: TransactionEvent, error: unknown): void {
+    const message = error instanceof Error ? error.message : String(error);
+    process.emitWarning(
+        `onAfterTransaction listener threw for ${event.serviceName}.${event.methodName}: ${message}`,
+        { type: "HieroListenerWarning", code: "HIERO_LISTENER_ERROR" },
+    );
+}
+
+/**
  * Central context for interacting with a Hiero network.
  * Manages the SDK Client lifecycle and provides access to the operator account.
  *
@@ -185,6 +196,7 @@ export class HieroContext implements IHieroContext {
     /**
      * Emit a before-transaction event to all registered listeners.
      * Called internally by service clients before executing a transaction.
+     * A throwing listener aborts the transaction before submission.
      *
      * @param event - The transaction event
      */
@@ -199,13 +211,18 @@ export class HieroContext implements IHieroContext {
     /**
      * Emit an after-transaction event to all registered listeners.
      * Called internally by service clients after a transaction completes.
+     * Never throws: a listener error is reported as a warning and the
+     * remaining listeners still run.
      *
      * @param event - The transaction event (includes result/error/duration)
      */
     public async emitAfterTransaction(event: TransactionEvent): Promise<void> {
         for (const listener of this.listeners) {
-            if (listener.onAfterTransaction) {
+            if (!listener.onAfterTransaction) continue;
+            try {
                 await listener.onAfterTransaction(event);
+            } catch (error) {
+                reportListenerError(event, error);
             }
         }
     }
