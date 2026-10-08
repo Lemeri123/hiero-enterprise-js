@@ -145,9 +145,12 @@ importers:
 
   samples/express-sample:
     dependencies:
-      '@hiero-hackers/enterprise-express':
+      '@hiero-hackers/enterprise-core':
         specifier: workspace:*
-        version: link:../../packages/express
+        version: link:../../packages/core
+      '@hiero-hackers/enterprise-mirror':
+        specifier: workspace:*
+        version: link:../../packages/mirror
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -161,9 +164,12 @@ importers:
 
   samples/fastify-sample:
     dependencies:
-      '@hiero-hackers/enterprise-fastify':
+      '@hiero-hackers/enterprise-core':
         specifier: workspace:*
-        version: link:../../packages/fastify
+        version: link:../../packages/core
+      '@hiero-hackers/enterprise-mirror':
+        specifier: workspace:*
+        version: link:../../packages/mirror
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -173,9 +179,12 @@ importers:
 
   samples/nest-sample:
     dependencies:
-      '@hiero-hackers/enterprise-nest':
+      '@hiero-hackers/enterprise-core':
         specifier: workspace:*
-        version: link:../../packages/nest
+        version: link:../../packages/core
+      '@hiero-hackers/enterprise-mirror':
+        specifier: workspace:*
+        version: link:../../packages/mirror
       '@nestjs/common':
         specifier: ^12.0.3
         version: 12.0.3(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)

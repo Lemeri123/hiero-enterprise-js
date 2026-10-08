@@ -1,14 +1,15 @@
 import "dotenv/config";
 import express from "express";
-import { hieroMiddleware } from "@hiero-hackers/enterprise-express";
+import type { NextFunction, Request, Response } from "express";
+import { createHiero, toHttpError } from "./hiero.js";
+
+// ─── Hiero Integration ────────────────────────────────────────
+// Create the services once and share them across all routes.
+// Config is read from env vars (see .env.example).
+const hiero = createHiero();
 
 const app = express();
 app.use(express.json());
-
-// ─── Hiero Integration ────────────────────────────────────────
-// All Hiero services are injected into req.hiero by the middleware.
-// No additional setup required — config is read from env vars.
-app.use(hieroMiddleware());
 
 // ─── Root Route ───────────────────────────────────────────────
 
@@ -41,135 +42,102 @@ app.get("/", (_req, res) => {
 // ─── Account Routes ───────────────────────────────────────────
 
 app.post("/api/accounts", async (req, res) => {
-    try {
-        const { publicKey, keyType, alias } = req.body;
-        const account = await req.hiero.accountService.createAccount({
-            publicKey,
-            keyType,
-            alias,
-        });
-        res.status(201).json(account);
-    } catch (error) {
-        res.status(500).json({ error: String(error) });
-    }
+    const { publicKey, keyType, alias } = req.body;
+    const account = await hiero.accountService.createAccount({
+        publicKey,
+        keyType,
+        alias,
+    });
+    res.status(201).json(account);
 });
 
 /** Get the operator account balance */
-app.get("/api/balance", async (req, res) => {
-    try {
-        const balance =
-            await req.hiero.accountService.getOperatorAccountBalance();
-        res.json(balance);
-    } catch (error) {
-        res.status(500).json({ error: String(error) });
-    }
+app.get("/api/balance", async (_req, res) => {
+    const balance = await hiero.accountService.getOperatorAccountBalance();
+    res.json(balance);
 });
 
 /** Query an account from the mirror node */
 app.get("/api/accounts/:id", async (req, res) => {
-    try {
-        const info = await req.hiero.accountRepository.findByAccountId(
-            req.params.id,
-        );
-        res.json(info);
-    } catch (error) {
-        res.status(500).json({ error: String(error) });
-    }
+    const info = await hiero.accountRepository.findByAccountId(req.params.id);
+    res.json(info);
 });
 
 /** Query NFTs owned by an account */
 app.get("/api/accounts/:id/nfts", async (req, res) => {
-    try {
-        const page = await req.hiero.nftRepository.findByOwner(req.params.id);
-        res.json(page);
-    } catch (error) {
-        res.status(500).json({ error: String(error) });
-    }
+    const page = await hiero.nftRepository.findByOwner(req.params.id);
+    res.json(page);
 });
 
 // ─── Token Routes ─────────────────────────────────────────────
 
 /** Query a token by ID */
 app.get("/api/tokens/:id", async (req, res) => {
-    try {
-        const info = await req.hiero.tokenRepository.findById(req.params.id);
-        res.json(info);
-    } catch (error) {
-        res.status(500).json({ error: String(error) });
-    }
+    const info = await hiero.tokenRepository.findById(req.params.id);
+    res.json(info);
 });
 
 // ─── Topic Routes ─────────────────────────────────────────────
 
 /** Query topic messages */
 app.get("/api/topics/:id/messages", async (req, res) => {
-    try {
-        const page = await req.hiero.topicRepository.findByTopicId(
-            req.params.id,
-        );
-        res.json(page);
-    } catch (error) {
-        res.status(500).json({ error: String(error) });
-    }
+    const page = await hiero.topicRepository.findByTopicId(req.params.id);
+    res.json(page);
 });
 
 /** Create a new public topic */
 app.post("/api/topics", async (req, res) => {
-    try {
-        const { memo } = req.body as { memo?: string };
-        const topicId = await req.hiero.topicService.createTopic({
-            topicMemo: memo,
-        });
-        res.status(201).json({ topicId });
-    } catch (error) {
-        res.status(500).json({ error: String(error) });
-    }
+    const { memo } = req.body as { memo?: string };
+    const topicId = await hiero.topicService.createTopic({
+        topicMemo: memo,
+    });
+    res.status(201).json({ topicId });
 });
 
 /** Submit a message to a topic */
 app.post("/api/topics/:id/messages", async (req, res) => {
-    try {
-        const { message } = req.body as { message: string };
-        const result = await req.hiero.topicService.submitMessage({
-            topicId: req.params.id,
-            message,
-        });
-        res.status(202).json({
-            status: "submitted",
-            sequenceNumber: result.sequenceNumber?.toString() ?? null,
-            transactionId: result.transactionId,
-        });
-    } catch (error) {
-        res.status(500).json({ error: String(error) });
-    }
+    const { message } = req.body as { message: string };
+    const result = await hiero.topicService.submitMessage({
+        topicId: req.params.id,
+        message,
+    });
+    res.status(202).json({
+        status: "submitted",
+        sequenceNumber: result.sequenceNumber?.toString() ?? null,
+        transactionId: result.transactionId,
+    });
 });
 
 // ─── Network Routes ───────────────────────────────────────────
 
 /** Query exchange rates */
-app.get("/api/network/exchange-rates", async (req, res) => {
-    try {
-        const rates = await req.hiero.networkRepository.findExchangeRates();
-        res.json(rates);
-    } catch (error) {
-        res.status(500).json({ error: String(error) });
-    }
+app.get("/api/network/exchange-rates", async (_req, res) => {
+    const rates = await hiero.networkRepository.findExchangeRates();
+    res.json(rates);
 });
 
 /** Query network supply */
-app.get("/api/network/supply", async (req, res) => {
-    try {
-        const supply = await req.hiero.networkRepository.findNetworkSupplies();
-        res.json(supply);
-    } catch (error) {
-        res.status(500).json({ error: String(error) });
-    }
+app.get("/api/network/supply", async (_req, res) => {
+    const supply = await hiero.networkRepository.findNetworkSupplies();
+    res.json(supply);
+});
+
+// ─── Error Handling ───────────────────────────────────────────
+// Express 5 forwards rejected async handlers here, so routes don't
+// need their own try/catch. Errors that aren't from Hiero fall through
+// to Express's default handler.
+
+app.use((error: unknown, _req: Request, res: Response, next: NextFunction) => {
+    const mapped = toHttpError(error);
+    if (!mapped) return next(error);
+    if (mapped.status >= 500) console.error(error);
+    res.status(mapped.status).json(mapped.body);
 });
 
 // ─── Start ────────────────────────────────────────────────────
 
 const port = process.env["PORT"] ?? 3000;
-app.listen(port, () => {
+const server = app.listen(port, () => {
     console.log(`🌐 Hiero Express sample running on http://localhost:${port}`);
     console.log();
     console.log("  Available endpoints:");
@@ -188,3 +156,14 @@ app.listen(port, () => {
     console.log(`    http://localhost:${port}/api/network/supply`);
     console.log();
 });
+
+// ─── Shutdown ─────────────────────────────────────────────────
+
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    process.once(signal, () => {
+        server.close(() => {
+            hiero.close();
+            process.exit(0);
+        });
+    });
+}

@@ -1,18 +1,22 @@
 import "dotenv/config";
 import { Module, Controller, Get, Post, Param, Body } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
+// Classes are used as DI tokens, so they must be value imports.
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import {
     AccountService,
     TopicService,
+    type AccountType,
+} from "@hiero-hackers/enterprise-core";
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+import {
     AccountRepository,
     NftRepository,
     TokenRepository,
     TopicRepository,
     NetworkRepository,
-    HieroModule,
-    AccountType,
-} from "@hiero-hackers/enterprise-nest";
+} from "@hiero-hackers/enterprise-mirror";
+import { HieroModule } from "./hiero.module.js";
 
 // ─── Controllers ──────────────────────────────────────────────
 
@@ -161,7 +165,7 @@ class NetworkController {
 // ─── App Module ───────────────────────────────────────────────
 
 @Module({
-    imports: [HieroModule.forRoot()],
+    imports: [HieroModule],
     controllers: [
         RootController,
         AccountController,
@@ -176,6 +180,8 @@ class AppModule {}
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);
+    // Run onApplicationShutdown (closes the Hiero client) on SIGINT/SIGTERM.
+    app.enableShutdownHooks();
     const port = process.env["PORT"] ?? 3002;
     await app.listen(port);
     console.log(`🏗️  Hiero NestJS sample running on http://localhost:${port}`);

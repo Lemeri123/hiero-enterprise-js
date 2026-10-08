@@ -1,6 +1,6 @@
 # NestJS Sample
 
-A REST API built with [NestJS](https://nestjs.com/) and `@hiero-hackers/enterprise-nest` demonstrating dependency injection of Hiero services into controllers.
+A REST API built with [NestJS](https://nestjs.com/), `@hiero-hackers/enterprise-core` and `@hiero-hackers/enterprise-mirror` demonstrating dependency injection of Hiero services into controllers.
 
 ## Setup
 
@@ -43,25 +43,33 @@ pnpm --filter hiero-nest-sample start
 
 ## How It Works
 
-Import `HieroModule.forRoot()` in your `AppModule`:
+[`src/hiero.module.ts`](./src/hiero.module.ts) is a small global module that registers the Hiero classes as providers:
 
 ```ts
-import { HieroModule } from '@hiero-hackers/enterprise-nest';
-
+@Global()
 @Module({
-  imports: [HieroModule.forRoot()],
+  providers: [
+    { provide: HieroContext, useFactory: () => new HieroContext() },
+    { provide: MirrorNodeClient, useFactory: () => createMirrorNodeClient() },
+    { provide: AccountService, useFactory: (c: HieroContext) => new AccountService(c), inject: [HieroContext] },
+    { provide: AccountRepository, useFactory: (m: MirrorNodeClient) => new AccountRepository(m), inject: [MirrorNodeClient] },
+    // …
+  ],
 })
-export class AppModule {}
+export class HieroModule implements OnApplicationShutdown {
+  constructor(private readonly context: HieroContext) {}
+  onApplicationShutdown() { this.context.close(); }
+}
 ```
 
-Then inject any service into your controllers:
+Import it once in your `AppModule`, then inject any service by type:
 
 ```ts
 @Controller('api')
 export class AccountController {
   constructor(
-    private readonly accountService: AccountService,
-    private readonly accountRepo: AccountRepository,
+    private readonly accountService: AccountService,       // from enterprise-core
+    private readonly accountRepo: AccountRepository,       // from enterprise-mirror
   ) {}
 
   @Get('balance')
@@ -71,4 +79,4 @@ export class AccountController {
 }
 ```
 
-All 15 services (6 clients + 6 repositories + context + mirror client + config) are available for injection.
+The module also registers an exception filter for `HieroError` and `MirrorError` that maps their codes to HTTP statuses (`NOT_FOUND` → 404, `TIMED_OUT` → 504, mirror failures → 502). `main.ts` calls `app.enableShutdownHooks()` so the SDK client is closed on `SIGINT`/`SIGTERM`.
