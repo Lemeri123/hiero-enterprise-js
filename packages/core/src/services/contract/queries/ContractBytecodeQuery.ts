@@ -1,7 +1,8 @@
 import type { ContractId } from "@hiero-ledger/sdk";
 import { ContractByteCodeQuery as SdkContractByteCodeQuery } from "@hiero-ledger/sdk";
 import type { IHieroContext } from "../../../context/index.js";
-import { normalizeError } from "../../../errors/index.js";
+import { QueryExecutor } from "../../transaction/index.js";
+import type { QueryOptions } from "../../transaction/index.js";
 
 /**
  * Fetch the deployed runtime bytecode for a contract.
@@ -11,15 +12,25 @@ import { normalizeError } from "../../../errors/index.js";
  * source build.
  */
 export class ContractBytecodeQuery {
-    constructor(private readonly context: IHieroContext) {}
+    private readonly executor: QueryExecutor;
 
-    async execute(contractId: string | ContractId): Promise<Uint8Array> {
-        try {
-            return await new SdkContractByteCodeQuery()
-                .setContractId(contractId)
-                .execute(this.context.client);
-        } catch (error) {
-            throw normalizeError(error, "ContractService.getContractBytecode");
-        }
+    constructor(context: IHieroContext) {
+        this.executor = new QueryExecutor(context);
+    }
+
+    async execute(
+        contractId: string | ContractId,
+        options: QueryOptions = {},
+    ): Promise<Uint8Array> {
+        return await this.executor.run(
+            () => new SdkContractByteCodeQuery().setContractId(contractId),
+            options,
+            {
+                type: "ContractByteCodeQuery",
+                serviceName: "ContractService",
+                methodName: "getContractBytecode",
+                timestamp: new Date(),
+            },
+        );
     }
 }

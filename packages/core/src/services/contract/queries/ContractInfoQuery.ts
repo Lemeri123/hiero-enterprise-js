@@ -1,7 +1,8 @@
 import type { ContractId, ContractInfo } from "@hiero-ledger/sdk";
 import { ContractInfoQuery as SdkContractInfoQuery } from "@hiero-ledger/sdk";
 import type { IHieroContext } from "../../../context/index.js";
-import { normalizeError } from "../../../errors/index.js";
+import { QueryExecutor } from "../../transaction/index.js";
+import type { QueryOptions } from "../../transaction/index.js";
 
 /**
  * Fetch the on-chain `ContractInfo` for a deployed contract.
@@ -11,15 +12,25 @@ import { normalizeError } from "../../../errors/index.js";
  * relationships, and `isDeleted` flag.
  */
 export class ContractInfoQuery {
-    constructor(private readonly context: IHieroContext) {}
+    private readonly executor: QueryExecutor;
 
-    async execute(contractId: string | ContractId): Promise<ContractInfo> {
-        try {
-            return await new SdkContractInfoQuery()
-                .setContractId(contractId)
-                .execute(this.context.client);
-        } catch (error) {
-            throw normalizeError(error, "ContractService.getContractInfo");
-        }
+    constructor(context: IHieroContext) {
+        this.executor = new QueryExecutor(context);
+    }
+
+    async execute(
+        contractId: string | ContractId,
+        options: QueryOptions = {},
+    ): Promise<ContractInfo> {
+        return await this.executor.run(
+            () => new SdkContractInfoQuery().setContractId(contractId),
+            options,
+            {
+                type: "ContractInfoQuery",
+                serviceName: "ContractService",
+                methodName: "getContractInfo",
+                timestamp: new Date(),
+            },
+        );
     }
 }

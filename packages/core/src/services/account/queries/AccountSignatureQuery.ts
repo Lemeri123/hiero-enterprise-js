@@ -5,6 +5,8 @@ import {
 } from "@hiero-ledger/sdk";
 import type { IHieroContext } from "../../../context/index.js";
 import { normalizeError } from "../../../errors/index.js";
+import { QueryExecutor } from "../../transaction/index.js";
+import type { QueryOptions } from "../../transaction/index.js";
 
 /**
  * Verify signatures against the public key currently associated with an
@@ -17,7 +19,11 @@ import { normalizeError } from "../../../errors/index.js";
  * single signature, so both verify methods return `false` for them.
  */
 export class AccountSignatureQuery {
-    constructor(private readonly context: IHieroContext) {}
+    private readonly executor: QueryExecutor;
+
+    constructor(context: IHieroContext) {
+        this.executor = new QueryExecutor(context);
+    }
 
     /**
      * Verify that `signature` over `message` was produced by the key of
@@ -30,9 +36,14 @@ export class AccountSignatureQuery {
         accountId: string | AccountId,
         message: Uint8Array,
         signature: Uint8Array,
+        options: QueryOptions = {},
     ): Promise<boolean> {
         try {
-            const key = await this.fetchSinglePublicKey(accountId);
+            const key = await this.fetchSinglePublicKey(
+                accountId,
+                options,
+                "verifyAccountSignature",
+            );
             if (key === null) return false;
             return key.verify(message, signature);
         } catch (error) {
@@ -52,9 +63,14 @@ export class AccountSignatureQuery {
     async verifyTransaction(
         accountId: string | AccountId,
         transaction: Transaction,
+        options: QueryOptions = {},
     ): Promise<boolean> {
         try {
-            const key = await this.fetchSinglePublicKey(accountId);
+            const key = await this.fetchSinglePublicKey(
+                accountId,
+                options,
+                "verifyAccountTransaction",
+            );
             if (key === null) return false;
             return key.verifyTransaction(transaction);
         } catch (error) {
@@ -72,10 +88,19 @@ export class AccountSignatureQuery {
      */
     private async fetchSinglePublicKey(
         accountId: string | AccountId,
+        options: QueryOptions,
+        methodName: string,
     ): Promise<PublicKey | null> {
-        const info = await new SdkAccountInfoQuery()
-            .setAccountId(accountId)
-            .execute(this.context.client);
+        const info = await this.executor.run(
+            () => new SdkAccountInfoQuery().setAccountId(accountId),
+            options,
+            {
+                type: "AccountInfoQuery",
+                serviceName: "AccountService",
+                methodName,
+                timestamp: new Date(),
+            },
+        );
 
         if (!(info.key instanceof PublicKey)) {
             return null;

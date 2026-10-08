@@ -36,6 +36,7 @@ import type {
 } from "./operations/index.js";
 import { AccountBalanceQuery, AccountSignatureQuery } from "./queries/index.js";
 import type {
+    QueryOptions,
     ScheduleOptions,
     TransactionOptions,
 } from "../transaction/index.js";
@@ -227,19 +228,27 @@ export class AccountService {
      * Get the balance of an account.
      *
      * @param accountId - Account to query
+     * @param options - Optional query options (payer, payment caps, node targeting)
      * @returns The account balance
      */
-    async getAccountBalance(accountId: string | AccountId): Promise<Balance> {
-        return await this.balanceQuery.execute(accountId);
+    async getAccountBalance(
+        accountId: string | AccountId,
+        options?: QueryOptions,
+    ): Promise<Balance> {
+        return await this.balanceQuery.execute(accountId, options);
     }
 
     /**
      * Get the balance of the operator account.
      *
+     * @param options - Optional query options (payer, payment caps, node targeting)
      * @returns The operator account balance
      */
-    async getOperatorAccountBalance(): Promise<Balance> {
-        return await this.balanceQuery.execute(this.context.operatorAccountId);
+    async getOperatorAccountBalance(options?: QueryOptions): Promise<Balance> {
+        return await this.balanceQuery.execute(
+            this.context.operatorAccountId,
+            options,
+        );
     }
 
     /**
@@ -254,16 +263,19 @@ export class AccountService {
      * @param accountId - Account whose key to check the signature against
      * @param message   - The original message bytes that were signed
      * @param signature - The signature bytes to verify
+     * @param options - Optional query options (payer, payment caps, node targeting)
      */
     async verifyAccountSignature(
         accountId: string | AccountId,
         message: Uint8Array,
         signature: Uint8Array,
+        options?: QueryOptions,
     ): Promise<boolean> {
         return await this.signatureQuery.verifySignature(
             accountId,
             message,
             signature,
+            options,
         );
     }
 
@@ -277,14 +289,17 @@ export class AccountService {
      *
      * @param accountId   - Account whose key to check the transaction signature against
      * @param transaction - The signed transaction to verify
+     * @param options - Optional query options (payer, payment caps, node targeting)
      */
     async verifyAccountTransaction(
         accountId: string | AccountId,
         transaction: Transaction,
+        options?: QueryOptions,
     ): Promise<boolean> {
         return await this.signatureQuery.verifyTransaction(
             accountId,
             transaction,
+            options,
         );
     }
 

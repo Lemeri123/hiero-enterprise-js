@@ -18,19 +18,30 @@ export class QueryExecutor {
     constructor(private readonly context: IHieroContext) {}
 
     /**
-     * Execute a pre-built query through the full lifecycle.
+     * Execute a query through the full lifecycle.
      *
-     * @param query - The built (but not yet executed) query.
+     * @param build - The query, or a function that builds it. Pass a
+     *   function so invalid input (e.g. a malformed ID) is reported as a
+     *   `HieroError` like any other failure.
      * @param options - Base query options (payer, payment caps, node targeting).
      * @param event - Event metadata emitted before and after execution.
      * @returns The query result, typed by the query's response type.
      */
     async run<TResult>(
-        query: Query<TResult>,
+        build: Query<TResult> | (() => Query<TResult>),
         options: QueryOptions,
         event: TransactionEvent,
     ): Promise<TResult> {
-        this.applyBaseOptions(query, options);
+        let query: Query<TResult>;
+        try {
+            query = typeof build === "function" ? build() : build;
+            this.applyBaseOptions(query, options);
+        } catch (error) {
+            throw normalizeError(
+                error,
+                `${event.serviceName}.${event.methodName}`,
+            );
+        }
 
         await this.context.emitBeforeTransaction(event);
         const start = Date.now();

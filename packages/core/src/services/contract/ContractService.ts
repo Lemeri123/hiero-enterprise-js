@@ -1,5 +1,5 @@
 import type { IHieroContext } from "../../context/index.js";
-import type { ScheduleOptions } from "../transaction/index.js";
+import type { QueryOptions, ScheduleOptions } from "../transaction/index.js";
 import {
     ContractCreateOperation,
     ContractCreateFlowOperation,
@@ -451,11 +451,13 @@ export class ContractService {
      * token relationships, and `isDeleted` flag.
      *
      * @param contractId - Contract whose info to fetch
+     * @param options - Optional query options (payer, payment caps, node targeting)
      */
     async getContractInfo(
         contractId: string | ContractId,
+        options?: QueryOptions,
     ): Promise<ContractInfo> {
-        return await this.infoQuery.execute(contractId);
+        return await this.infoQuery.execute(contractId, options);
     }
 
     /**
@@ -464,10 +466,12 @@ export class ContractService {
      * comparison, or off-chain verification against a known source build.
      *
      * @param contractId - Contract whose bytecode to fetch
+     * @param options - Optional query options (payer, payment caps, node targeting)
      */
     async getContractBytecode(
         contractId: string | ContractId,
+        options?: QueryOptions,
     ): Promise<Uint8Array> {
-        return await this.bytecodeQuery.execute(contractId);
+        return await this.bytecodeQuery.execute(contractId, options);
     }
 }

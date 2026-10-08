@@ -6,7 +6,7 @@ import {
     type TokenId,
 } from "@hiero-ledger/sdk";
 import type { IHieroContext } from "../../context/index.js";
-import type { ScheduleOptions } from "../transaction/index.js";
+import type { QueryOptions, ScheduleOptions } from "../transaction/index.js";
 import { TokenInfoQuery, TokenNftInfoQuery } from "./queries/index.js";
 import type { TokenInfoResult, TokenNftInfoResult } from "./queries/index.js";
 import {
@@ -1018,6 +1018,7 @@ export class TokenService {
      * {@link TokenService.getNftInfo} instead.
      *
      * @param tokenId - The token entity ID (e.g., `"0.0.12345"`)
+     * @param options - Optional query options (payer, payment caps, node targeting)
      * @returns A plain-object snapshot of the token definition. IDs and
      *          large numeric fields are stringified for ergonomics;
      *          keys are returned as raw SDK `Key` instances
@@ -1031,8 +1032,11 @@ export class TokenService {
      * }
      * ```
      */
-    async getTokenInfo(tokenId: string | TokenId): Promise<TokenInfoResult> {
-        return await this.tokenInfoQuery.execute(tokenId);
+    async getTokenInfo(
+        tokenId: string | TokenId,
+        options?: QueryOptions,
+    ): Promise<TokenInfoResult> {
+        return await this.tokenInfoQuery.execute(tokenId, options);
     }
 
     /**
@@ -1045,6 +1049,7 @@ export class TokenService {
      *
      * @param nftId - The NFT serial, either as an `NftId` instance or a
      *   `"<tokenId>/<serial>"` / `"<tokenId>@<serial>"` string
+     * @param options - Optional query options (payer, payment caps, node targeting)
      * @returns A plain-object snapshot of the serial. IDs are
      *          stringified, `creationTime` is an ISO-8601 string, and
      *          `metadata` is the raw bytes the NFT was minted with
@@ -1057,8 +1062,11 @@ export class TokenService {
      * console.log(nft.accountId, nft.serial, nft.metadata);
      * ```
      */
-    async getNftInfo(nftId: string | NftId): Promise<TokenNftInfoResult> {
-        return await this.tokenNftInfoQuery.execute(nftId);
+    async getNftInfo(
+        nftId: string | NftId,
+        options?: QueryOptions,
+    ): Promise<TokenNftInfoResult> {
+        return await this.tokenNftInfoQuery.execute(nftId, options);
     }
 
     private buildFungibleOperationOptions(

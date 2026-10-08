@@ -1,11 +1,9 @@
 import type { NftId } from "@hiero-ledger/sdk";
 import { TokenNftInfoQuery as SdkTokenNftInfoQuery } from "@hiero-ledger/sdk";
 import type { IHieroContext } from "../../../context/index.js";
-import {
-    HieroError,
-    HieroErrorCodes,
-    normalizeError,
-} from "../../../errors/index.js";
+import { QueryExecutor } from "../../transaction/index.js";
+import type { QueryOptions } from "../../transaction/index.js";
+import { HieroError, HieroErrorCodes } from "../../../errors/index.js";
 
 /**
  * A plain-object representation of a single NFT serial.
@@ -48,7 +46,11 @@ export interface TokenNftInfoResult {
  * inspect.
  */
 export class TokenNftInfoQuery {
-    constructor(private readonly context: IHieroContext) {}
+    private readonly executor: QueryExecutor;
+
+    constructor(context: IHieroContext) {
+        this.executor = new QueryExecutor(context);
+    }
 
     /**
      * Fetch info about the given NFT serial.
@@ -58,35 +60,41 @@ export class TokenNftInfoQuery {
      * @returns Plain-object info for the requested serial — throws if the
      *          serial does not exist or the network rejects the query
      */
-    async execute(nftId: string | NftId): Promise<TokenNftInfoResult> {
-        try {
-            const infos = await new SdkTokenNftInfoQuery()
-                .setNftId(nftId)
-                .execute(this.context.client);
+    async execute(
+        nftId: string | NftId,
+        options: QueryOptions = {},
+    ): Promise<TokenNftInfoResult> {
+        const infos = await this.executor.run(
+            () => new SdkTokenNftInfoQuery().setNftId(nftId),
+            options,
+            {
+                type: "TokenNftInfoQuery",
+                serviceName: "TokenService",
+                methodName: "getNftInfo",
+                timestamp: new Date(),
+            },
+        );
 
-            const info = infos[0];
-            if (info == null) {
-                throw new HieroError(
-                    `No NFT info returned for ${nftId.toString()}`,
-                    {
-                        code: HieroErrorCodes.NotFound,
-                        context: "TokenService.getNftInfo",
-                    },
-                );
-            }
-
-            return {
-                nftId: info.nftId.toString(),
-                tokenId: info.nftId.tokenId.toString(),
-                serial: info.nftId.serial.toString(),
-                accountId: info.accountId.toString(),
-                creationTime: info.creationTime.toDate().toISOString(),
-                metadata: info.metadata,
-                spenderId: info.spenderId?.toString() ?? null,
-                ledgerId: info.ledgerId?.toString() ?? null,
-            };
-        } catch (error) {
-            throw normalizeError(error, "TokenService.getNftInfo");
+        const info = infos[0];
+        if (info == null) {
+            throw new HieroError(
+                `No NFT info returned for ${nftId.toString()}`,
+                {
+                    code: HieroErrorCodes.NotFound,
+                    context: "TokenService.getNftInfo",
+                },
+            );
         }
+
+        return {
+            nftId: info.nftId.toString(),
+            tokenId: info.nftId.tokenId.toString(),
+            serial: info.nftId.serial.toString(),
+            accountId: info.accountId.toString(),
+            creationTime: info.creationTime.toDate().toISOString(),
+            metadata: info.metadata,
+            spenderId: info.spenderId?.toString() ?? null,
+            ledgerId: info.ledgerId?.toString() ?? null,
+        };
     }
 }
