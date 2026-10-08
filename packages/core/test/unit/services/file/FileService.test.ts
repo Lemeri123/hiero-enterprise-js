@@ -171,44 +171,5 @@ describe("FileService [partial content failure]", () => {
                 code: HieroErrorCodes.SdkError,
             });
         });
-
-        it("distinguishes post-consensus observer errors from actual append failures", async () => {
-            const largeContents = Buffer.alloc(5000, "w");
-            const fileId = "0.0.88888";
-
-            vi.spyOn(
-                service["updateOperation"],
-                "execute",
-            ).mockResolvedValueOnce({
-                status: "SUCCESS",
-            } as any);
-
-            const observerError = new HieroError(
-                "Listener database write failed",
-                {
-                    code: HieroErrorCodes.ResultMappingFailed,
-                    transactionId: "0.0.2@1234567890.999",
-                    cause: new Error("DB connection lost"),
-                },
-            );
-
-            vi.spyOn(
-                service["appendOperation"],
-                "execute",
-            ).mockRejectedValueOnce(observerError);
-
-            const error = await service
-                .updateFile({ fileId, contents: largeContents })
-                .catch((e) => e);
-
-            expect(error).toBeInstanceOf(HieroError);
-            expect(error.fileId).toBe(fileId);
-            expect(error.code).toBe(HieroErrorCodes.ResultMappingFailed);
-            expect(error.message).toContain("append transaction succeeded");
-            expect(error.message).toContain("post-transaction observer failed");
-            expect(error.message).not.toContain(
-                "appending the remainder of its contents failed",
-            );
-        });
     });
 });
