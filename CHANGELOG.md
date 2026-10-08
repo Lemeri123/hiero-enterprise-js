@@ -48,6 +48,10 @@ All published packages (`@hiero-hackers/enterprise-core`, `-mirror`, `-express`,
 - Issue moderation workflows. New issues are labelled `pending-review` and locked
   until a maintainer applies the `approved` label ([#175]).
 
+### Fixed
+
+- Fixed `HieroContext` leaking an SDK client when the operator credentials are invalid; credentials are now parsed before the client is created, and a malformed `operatorId` throws a `HieroError` with `CONFIG_INVALID` instead of a raw SDK error. [#271](https://github.com/hiero-hackers/hiero-enterprise-js/pull/271) [#246](https://github.com/hiero-hackers/hiero-enterprise-js/issues/246)
+
 ### Security
 
 - Pinned the transitive `ws` dependency to `^8.21.3` (GHSA-96hv-2xvq-fx4p,
