@@ -55,6 +55,7 @@ pnpm --filter hiero-nest-sample start
     { provide: AccountRepository, useFactory: (m: MirrorNodeClient) => new AccountRepository(m), inject: [MirrorNodeClient] },
     // …
   ],
+  exports: [HieroContext, MirrorNodeClient, AccountService, AccountRepository /* , … */],
 })
 export class HieroModule implements OnApplicationShutdown {
   constructor(private readonly context: HieroContext) {}

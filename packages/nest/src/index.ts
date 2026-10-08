@@ -215,30 +215,7 @@ export class HieroModule {
     }
 }
 
-// Re-export the DI-token classes. Symbols already imported above are
-// exported as local bindings; the rest re-export from their package.
-export {
-    AccountService,
-    ScheduleService,
-    FileService,
-    TokenService,
-    ContractService,
-    TopicService,
-    MirrorNodeClient,
-};
-export { AccountType, OperatorKeyType } from "@hiero-hackers/enterprise-core";
-export {
-    AccountRepository,
-    NftRepository,
-    TokenRepository,
-    TopicRepository,
-    TransactionRepository,
-    NetworkRepository,
-    ScheduleRepository,
-    BlockRepository,
-    ContractRepository,
-} from "@hiero-hackers/enterprise-mirror";
-export type { HieroConfig } from "@hiero-hackers/enterprise-core";
+export * from "./reexports.js";
 export type { HieroAdapterConfig };
 export type { HieroServices } from "./runtime.js";
 

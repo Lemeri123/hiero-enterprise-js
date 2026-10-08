@@ -46,10 +46,11 @@ export interface HttpError {
 
 export function toHttpError(error: unknown): HttpError | undefined {
     if (error instanceof MirrorError || error instanceof HieroError) {
-        return {
-            status: statusFor(error),
-            body: { code: error.code, message: error.message },
-        };
+        const status = statusFor(error);
+        // 5xx messages can carry upstream URLs or SDK details; log, don't return them.
+        const message =
+            status >= 500 ? "Upstream request failed" : error.message;
+        return { status, body: { code: error.code, message } };
     }
     return undefined;
 }

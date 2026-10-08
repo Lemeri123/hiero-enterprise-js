@@ -63,9 +63,12 @@ class HieroExceptionFilter implements ExceptionFilter {
     catch(error: HieroError | MirrorError, host: ArgumentsHost) {
         const status = statusFor(error);
         if (status >= 500) console.error(error);
+        // 5xx messages can carry upstream URLs or SDK details; log, don't return them.
+        const message =
+            status >= 500 ? "Upstream request failed" : error.message;
         this.adapterHost.httpAdapter.reply(
             host.switchToHttp().getResponse(),
-            { code: error.code, message: error.message },
+            { code: error.code, message },
             status,
         );
     }
