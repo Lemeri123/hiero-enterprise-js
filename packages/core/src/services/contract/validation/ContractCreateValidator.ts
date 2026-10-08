@@ -91,9 +91,12 @@ export class ContractCreateValidator {
             );
         }
 
-        if (typeof value === "bigint" && value < 0n) {
+        // The SDK treats a bigint as 0 HBAR, so reject it.
+        if (typeof value === "bigint") {
             throw normalizeError(
-                new Error("initialBalance must not be negative."),
+                new Error(
+                    "initialBalance must be a number, string, Long, BigNumber or Hbar, not a bigint.",
+                ),
                 "ContractCreateValidator",
             );
         }

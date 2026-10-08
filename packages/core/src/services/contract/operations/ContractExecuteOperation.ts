@@ -57,7 +57,7 @@ export interface ContractExecuteOperationOptions extends TransactionOptions {
      * HBAR forwarded to the contract with the call (for `payable`
      * functions). Defaults to `0` when omitted.
      */
-    payableAmount?: number | string | Long | BigNumber | Hbar | bigint;
+    payableAmount?: number | string | Long | BigNumber | Hbar;
     /**
      * Also return the function's EVM outcome (return data, gas used,
      * error message) on `result.functionResult`. **Costs one extra paid

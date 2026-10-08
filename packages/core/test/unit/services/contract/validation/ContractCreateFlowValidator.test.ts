@@ -124,13 +124,13 @@ describe("ContractCreateFlowValidator", () => {
             ).toThrow(/initialBalance must not be negative/);
         });
 
-        it("throws on a negative bigint", () => {
+        it("throws on a bigint", () => {
             expect(() =>
                 validator.validate({
                     ...baseOptions,
-                    initialBalance: -1n,
+                    initialBalance: 5n as never,
                 }),
-            ).toThrow(/initialBalance must not be negative/);
+            ).toThrow(/initialBalance must be .* not a bigint/);
         });
 
         it("throws on a negative Long", () => {

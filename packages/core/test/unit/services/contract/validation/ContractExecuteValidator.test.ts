@@ -153,10 +153,13 @@ describe("ContractExecuteValidator", () => {
             ).toThrow(/payableAmount must not be negative/);
         });
 
-        it("throws when payableAmount is a negative bigint", () => {
+        it("throws when payableAmount is a bigint", () => {
             expect(() =>
-                validator.validate({ ...baseOptions, payableAmount: -1n }),
-            ).toThrow(/payableAmount must not be negative/);
+                validator.validate({
+                    ...baseOptions,
+                    payableAmount: 5n as never,
+                }),
+            ).toThrow(/payableAmount must be .* not a bigint/);
         });
 
         it("throws when payableAmount is a negative Long", () => {
