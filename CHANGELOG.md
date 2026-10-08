@@ -50,12 +50,7 @@ All published packages (`@hiero-hackers/enterprise-core`, `-mirror`, `-express`,
 
 ### Fixed
 
-- `enterprise-core`: a throwing transaction listener no longer changes an
-  outcome ([#245], [#269]). Previously an `onBeforeTransaction` error blocked the
-  transaction, and an `onAfterTransaction` error turned a success into an error,
-  fired the after-event twice, or replaced the original error. Listener errors
-  are now reported as `HIERO_LISTENER_ERROR` process warnings and the remaining
-  listeners still run.
+- Fixed a throwing transaction listener changing the outcome of a transaction or query; an `onBeforeTransaction` error no longer blocks the transaction, and an `onAfterTransaction` error no longer turns a success into an error, fires the after-event twice, or replaces the original error. Listener errors are now reported as `HIERO_LISTENER_ERROR` process warnings and the remaining listeners still run. [#269](https://github.com/hiero-hackers/hiero-enterprise-js/pull/269) [#245](https://github.com/hiero-hackers/hiero-enterprise-js/issues/245)
 - Fixed `HieroContext` leaking an SDK client when the operator credentials are invalid; credentials are now parsed before the client is created, and a malformed `operatorId` throws a `HieroError` with `CONFIG_INVALID` instead of a raw SDK error. [#271](https://github.com/hiero-hackers/hiero-enterprise-js/pull/271) [#246](https://github.com/hiero-hackers/hiero-enterprise-js/issues/246)
 
 ### Security
@@ -250,5 +245,3 @@ npm registry ([#126], [#133]).
 [#201]: https://github.com/hiero-hackers/hiero-enterprise-js/pull/201
 [#212]: https://github.com/hiero-hackers/hiero-enterprise-js/pull/212
 [#238]: https://github.com/hiero-hackers/hiero-enterprise-js/issues/238
-[#245]: https://github.com/hiero-hackers/hiero-enterprise-js/issues/245
-[#269]: https://github.com/hiero-hackers/hiero-enterprise-js/pull/269
