@@ -226,7 +226,7 @@ describe("TokenService cancel airdrop operations [Integration]", () => {
                 receiver.accountId,
                 fungibleTokenId,
             ),
-        ).toBeUndefined();
+        ).toBe("0");
         expect(
             await tokenBalanceFor(
                 accountService,

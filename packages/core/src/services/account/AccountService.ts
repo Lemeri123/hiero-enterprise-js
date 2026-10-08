@@ -34,7 +34,11 @@ import type {
     ScheduleTransferTokenOptions,
     ScheduleTransferNftOptions,
 } from "./operations/index.js";
-import { AccountBalanceQuery, AccountSignatureQuery } from "./queries/index.js";
+import {
+    AccountBalanceQuery,
+    AccountSignatureQuery,
+    TokenBalanceQuery,
+} from "./queries/index.js";
 import type {
     QueryOptions,
     ScheduleOptions,
@@ -55,6 +59,7 @@ export class AccountService {
     private readonly deleteAllNftAllowancesOperation: DeleteAllNftAllowancesOperation;
     private readonly transferOperation: TransferOperation;
     private readonly balanceQuery: AccountBalanceQuery;
+    private readonly tokenBalanceQuery: TokenBalanceQuery;
     private readonly signatureQuery: AccountSignatureQuery;
 
     constructor(private readonly context: IHieroContext) {
@@ -68,6 +73,7 @@ export class AccountService {
             new DeleteAllNftAllowancesOperation(context);
         this.transferOperation = new TransferOperation(context);
         this.balanceQuery = new AccountBalanceQuery(context);
+        this.tokenBalanceQuery = new TokenBalanceQuery(context);
         this.signatureQuery = new AccountSignatureQuery(context);
     }
 
@@ -248,7 +254,7 @@ export class AccountService {
         accountId: string | AccountId,
         tokenId: string | TokenId,
     ): Promise<TokenBalance> {
-        return await this.balanceQuery.executeTokenBalance(accountId, tokenId);
+        return await this.tokenBalanceQuery.execute(accountId, tokenId);
     }
 
     /**
