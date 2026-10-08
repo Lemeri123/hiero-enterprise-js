@@ -65,6 +65,35 @@ export class HieroContext implements IHieroContext {
         const resolved = config ?? resolveConfigFromEnv()!;
         this.config = resolved;
 
+        // Parse credentials before creating the client, so invalid config
+        // never leaves an open client behind.
+        try {
+            this.operatorAccountId = AccountId.fromString(resolved.operatorId);
+        } catch (cause) {
+            throw new HieroError(
+                `Invalid operator account ID "${resolved.operatorId}". Expected the form "0.0.12345".`,
+                {
+                    code: HieroErrorCodes.ConfigInvalid,
+                    cause: cause instanceof Error ? cause : undefined,
+                },
+            );
+        }
+
+        try {
+            this._operatorKey = parsePrivateKey(
+                resolved.operatorKey,
+                resolved.operatorKeyType,
+            );
+        } catch (cause) {
+            throw new HieroError(
+                `Invalid operator key. Ensure HIERO_OPERATOR_KEY is valid for type "${resolved.operatorKeyType}".`,
+                {
+                    code: HieroErrorCodes.ConfigInvalid,
+                    cause: cause instanceof Error ? cause : undefined,
+                },
+            );
+        }
+
         // Resolve network
         const network = resolved.network.toLowerCase();
         if (network === "mainnet" || network === "hedera-mainnet") {
@@ -86,24 +115,6 @@ export class HieroContext implements IHieroContext {
                 `Unknown network "${resolved.network}". Provide networkNodes (consensus node addresses) for custom networks ` +
                     `(e.g. via HIERO_NETWORK_NODES="127.0.0.1:50211=0.0.3").`,
                 { code: HieroErrorCodes.ConfigInvalid },
-            );
-        }
-
-        // Parse and validate operator credentials
-        this.operatorAccountId = AccountId.fromString(resolved.operatorId);
-
-        try {
-            this._operatorKey = parsePrivateKey(
-                resolved.operatorKey,
-                resolved.operatorKeyType,
-            );
-        } catch (cause) {
-            throw new HieroError(
-                `Invalid operator key. Ensure HIERO_OPERATOR_KEY is valid for type "${resolved.operatorKeyType}".`,
-                {
-                    code: HieroErrorCodes.ConfigInvalid,
-                    cause: cause instanceof Error ? cause : undefined,
-                },
             );
         }
 
