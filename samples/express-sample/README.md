@@ -1,6 +1,6 @@
 # Express Sample
 
-A REST API built with [Express](https://expressjs.com/) and `@hiero-hackers/enterprise-express` demonstrating how to query accounts, tokens, NFTs, topics, and network data from a Hiero network.
+A REST API built with [Express](https://expressjs.com/), `@hiero-hackers/enterprise-core` and `@hiero-hackers/enterprise-mirror` demonstrating how to query accounts, tokens, NFTs, topics, and network data from a Hiero network.
 
 ## Setup
 
@@ -43,16 +43,22 @@ pnpm --filter hiero-express-sample start
 
 ## How It Works
 
-The key integration point is `hieroMiddleware()`:
+[`src/hiero.ts`](./src/hiero.ts) creates the Hiero services once at startup:
 
 ```ts
-import { hieroMiddleware } from '@hiero-hackers/enterprise-express';
+import { createHiero, toHttpError } from './hiero.js';
 
-app.use(hieroMiddleware());
+const hiero = createHiero(); // reads HIERO_* env vars
+
+app.get('/api/balance', async (_req, res) => {
+  res.json(await hiero.accountService.getOperatorAccountBalance());
+});
 ```
 
-This single line injects all Hiero services into every request at `req.hiero`, giving you access to:
+`hiero` exposes:
 
-- **Services**: `accountService`, `fileService`, `tokenService`, `contractService`, `topicService`
-- **Repositories**: `accountRepository`, `nftRepository`, `tokenRepository`, `topicRepository`, `transactionRepository`, `networkRepository`
-- **Infra**: `context`
+- **Services** (core): `accountService`, `topicService`. Add any other core service the same way.
+- **Repositories** (mirror): `accountRepository`, `nftRepository`, `tokenRepository`, `topicRepository`, `transactionRepository`, `networkRepository`, and the rest of `createMirrorRepositories()`.
+- **`close()`**: releases the SDK client. The app calls it on `SIGINT`/`SIGTERM` after the server stops.
+
+Express 5 forwards errors from async routes to the error-handling middleware. That middleware uses `toHttpError()` to turn `HieroError` / `MirrorError` codes into HTTP statuses (`NOT_FOUND` → 404, `TIMED_OUT` → 504, mirror failures → 502), and passes any other error on to Express's default handler.

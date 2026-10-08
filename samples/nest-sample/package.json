@@ -2,7 +2,7 @@
     "name": "hiero-nest-sample",
     "version": "1.0.0",
     "private": true,
-    "description": "Sample NestJS app using @hiero-hackers/enterprise-nest",
+    "description": "Sample NestJS app using @hiero-hackers/enterprise-core and @hiero-hackers/enterprise-mirror",
     "type": "module",
     "scripts": {
         "dev": "tsc && node dist/main.js",
@@ -10,7 +10,8 @@
         "start": "node dist/main.js"
     },
     "dependencies": {
-        "@hiero-hackers/enterprise-nest": "workspace:*",
+        "@hiero-hackers/enterprise-core": "workspace:*",
+        "@hiero-hackers/enterprise-mirror": "workspace:*",
         "@nestjs/common": "^12.0.3",
         "@nestjs/core": "^12.0.3",
         "@nestjs/platform-express": "^12.0.3",

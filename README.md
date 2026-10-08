@@ -12,9 +12,7 @@ Similarly, reading data from the mirror node has meant hand-rolling REST calls, 
 
 Hiero Enterprise JS does that work for you. 
 
-Drop in the middleware or module for your framework of choice and your routes get typed access to accounts, tokens, NFTs, smart contracts, topics, and mirror node queries — without any of the setup code.
-
-It gives each major Node.js framework a native integration that matches how developers already think about that framework — middleware for Express/Fastify, dependency injection for NestJS. Write operations (creating accounts, minting tokens) go through the network client directly. Read operations (looking up balances, browsing NFTs) go through the mirror node REST API, which is faster and doesn't carry transaction fees. Both are exposed through a consistent interface so you don't have to think about which path to use.
+Two packages give you typed access to accounts, tokens, NFTs, smart contracts, topics, and mirror node queries, and work the same in a script, a worker, or any Node.js framework. Write operations (creating accounts, minting tokens) go through the network client directly. Read operations (looking up balances, browsing NFTs) go through the mirror node REST API, which is faster and doesn't carry transaction fees.
 
 ## Packages
 
@@ -22,19 +20,17 @@ It gives each major Node.js framework a native integration that matches how deve
 |---------|-------------|
 | [`@hiero-hackers/enterprise-core`](./packages/core) | SDK write-side: services, transactions, operator keys — use directly or with any framework |
 | [`@hiero-hackers/enterprise-mirror`](./packages/mirror) | Mirror node read-side: repositories, pagination, rate limiting, filters, unit helpers — **zero dependencies, no credentials** |
-| [`@hiero-hackers/enterprise-express`](./packages/express) | Express middleware — `req.hiero.*` (composes core + mirror) |
-| [`@hiero-hackers/enterprise-fastify`](./packages/fastify) | Fastify plugin — `fastify.hiero.*` (composes core + mirror) |
-| [`@hiero-hackers/enterprise-nest`](./packages/nest) | NestJS module — `HieroModule.forRoot()` with full DI (composes core + mirror) |
+| [`@hiero-hackers/enterprise-express`](./packages/express) | **Deprecated**: Express middleware. See [migrating](#migrating-from-the-framework-adapters) |
+| [`@hiero-hackers/enterprise-fastify`](./packages/fastify) | **Deprecated**: Fastify plugin. See [migrating](#migrating-from-the-framework-adapters) |
+| [`@hiero-hackers/enterprise-nest`](./packages/nest) | **Deprecated**: NestJS module. See [migrating](#migrating-from-the-framework-adapters) |
 
-Each package README documents its full surface — the adapter READMEs
-list everything available on `req.hiero` / `app.hiero` / via DI, so you
-never have to guess what arrived pre-composed.
+Each package README documents its full surface.
 
 ### Which package do I install?
 
 | You are building… | Install / import | Reads | Writes |
 |---|---|---|---|
-| An Express / Fastify / NestJS service | **the adapter only** — repositories and services arrive pre-composed on `req.hiero.*` / `app.hiero.*` / DI; you never import core or mirror directly | ✓ | ✓ |
+| An Express / Fastify / NestJS service | `@hiero-hackers/enterprise-core` + `@hiero-hackers/enterprise-mirror`, wired once at startup ([how](#using-with-express-fastify-or-nestjs)) | ✓ | ✓ |
 | A read-only tool, dashboard, or indexer | `@hiero-hackers/enterprise-mirror` only — no credentials needed | ✓ | — |
 | A script or worker that submits transactions | `@hiero-hackers/enterprise-core` (add `mirror` if it also reads) | opt-in | ✓ |
 
@@ -78,16 +74,9 @@ console.log(account.accountId);
 context.close();
 ```
 
-### With a framework
+### Configuration from the environment
 
-```bash
-# Install your framework adapter 
-npm install @hiero-hackers/enterprise-express
-npm install @hiero-hackers/enterprise-fastify
-npm install @hiero-hackers/enterprise-nest
-```
-
-Set your operator credentials as environment variables:
+Called without arguments, `new HieroContext()` and `createMirrorNodeClient()` read their config from environment variables:
 
 ```bash
 HIERO_NETWORK=testnet
@@ -104,67 +93,103 @@ HIERO_OPERATOR_KEY_TYPE=ECDSA
 | `ED25519` | Ed25519 key — native Hiero key type |
 | `DER` | DER-encoded key (hex with ASN.1 headers, e.g. `302e020100...`) |
 
-Or pass config directly when registering the integration.
+## Using with Express, Fastify, or NestJS
+
+No framework-specific package is needed. Create the services once at startup, share them across requests, and close the context on shutdown:
+
+```ts
+import { HieroContext, AccountService, TopicService } from '@hiero-hackers/enterprise-core';
+import { createMirrorNodeClient, createMirrorRepositories } from '@hiero-hackers/enterprise-mirror';
+
+export function createHiero() {
+  const context = new HieroContext(); // reads HIERO_* env vars
+  return {
+    accountService: new AccountService(context),
+    topicService: new TopicService(context),
+    ...createMirrorRepositories(createMirrorNodeClient()), // accountRepository, tokenRepository, …
+    close: () => context.close(),
+  };
+}
+```
 
 **Express**
 
 ```ts
-import express from 'express';
-import { hieroMiddleware } from '@hiero-hackers/enterprise-express';
-
+const hiero = createHiero();
 const app = express();
-app.use(hieroMiddleware());
 
-app.get('/balance', async (req, res) => {
-  const balance = await req.hiero.accountService.getOperatorAccountBalance();
-  res.json(balance);
+app.get('/balance', async (_req, res) => {
+  res.json(await hiero.accountService.getOperatorAccountBalance());
 });
+
+const server = app.listen(3000);
+process.once('SIGTERM', () => server.close(() => hiero.close()));
 ```
 
 **Fastify**
 
 ```ts
-import Fastify from 'fastify';
-import { hieroPlugin } from '@hiero-hackers/enterprise-fastify';
-
+const hiero = createHiero();
 const app = Fastify();
-await app.register(hieroPlugin);
+app.addHook('onClose', () => hiero.close());
 
-app.get('/balance', async () => {
-  return app.hiero.accountService.getOperatorAccountBalance();
-});
+app.get('/balance', () => hiero.accountService.getOperatorAccountBalance());
 ```
 
-**NestJS**
+**NestJS**: register the classes as providers with factories, so controllers inject them by type:
 
 ```ts
-import { Module } from '@nestjs/common';
-import { HieroModule, AccountService } from '@hiero-hackers/enterprise-nest';
-
-@Module({ imports: [HieroModule.forRoot()] })
-export class AppModule {}
-
-@Controller('balance')
-export class BalanceController {
-  constructor(private readonly accounts: AccountService) {}
-
-  @Get()
-  getBalance() {
-    return this.accounts.getOperatorAccountBalance();
-  }
+@Global()
+@Module({
+  providers: [
+    { provide: HieroContext, useFactory: () => new HieroContext() },
+    { provide: MirrorNodeClient, useFactory: () => createMirrorNodeClient() },
+    { provide: AccountService, useFactory: (c: HieroContext) => new AccountService(c), inject: [HieroContext] },
+    { provide: AccountRepository, useFactory: (m: MirrorNodeClient) => new AccountRepository(m), inject: [MirrorNodeClient] },
+  ],
+  exports: [HieroContext, MirrorNodeClient, AccountService, AccountRepository],
+})
+export class HieroModule implements OnApplicationShutdown {
+  constructor(private readonly context: HieroContext) {}
+  onApplicationShutdown() { this.context.close(); }
 }
 ```
+
+Each [sample](#samples) is a complete, runnable version of the above. Each one also maps `HieroError` / `MirrorError` codes to HTTP statuses (for example `NOT_FOUND` to 404 and `TIMED_OUT` to 504) instead of returning every failure as a 500.
+
+## Migrating from the framework adapters
+
+`@hiero-hackers/enterprise-express`, `@hiero-hackers/enterprise-fastify` and `@hiero-hackers/enterprise-nest` are **deprecated** and will be removed in a future release. They still work, but log a one-time `DeprecationWarning` (silence it with `node --no-deprecation`). The reasoning is in [#238](https://github.com/hiero-hackers/hiero-enterprise-js/issues/238).
+
+1. Replace the adapter dependency with the two packages it wrapped:
+   ```bash
+   npm uninstall @hiero-hackers/enterprise-express   # or -fastify / -nest
+   npm install @hiero-hackers/enterprise-core @hiero-hackers/enterprise-mirror
+   ```
+2. Add a `createHiero()` (Express/Fastify) or `HieroModule` (NestJS) to your app, as shown [above](#using-with-express-fastify-or-nestjs). It reads the same `HIERO_*` environment variables, so no config changes are needed.
+3. Update call sites:
+
+   | Before | After |
+   |---|---|
+   | `app.use(hieroMiddleware())` | `const hiero = createHiero()` |
+   | `req.hiero.accountService` | `hiero.accountService` |
+   | `await app.register(hieroPlugin)` | `const hiero = createHiero()` + `app.addHook('onClose', () => hiero.close())` |
+   | `app.hiero.tokenRepository` | `hiero.tokenRepository` |
+   | `HieroModule.forRoot()` from `enterprise-nest` | your own `HieroModule` |
+   | `import { AccountService } from '@hiero-hackers/enterprise-nest'` | `import { AccountService } from '@hiero-hackers/enterprise-core'` |
+   | `import { AccountRepository } from '@hiero-hackers/enterprise-nest'` | `import { AccountRepository } from '@hiero-hackers/enterprise-mirror'` |
+   | `@InjectHieroContext()` | inject `HieroContext` by type |
+
+4. Close the context on shutdown: the Express middleware never did this, so this step fixes a connection leak.
 
 ## Architecture
 
 ```
-          Express / Fastify / NestJS adapters
-     req.hiero.* | fastify.hiero.* | @Inject()
-              │ compose both packages │
-       ┌──────┴──────────┐  ┌─────────┴──────────┐
-       ▼                 ▼  ▼                    ▼
+      Your app: script, worker, Express / Fastify / NestJS
+              │                          │
+              ▼                          ▼
 ┌───────────────────────┐  ┌────────────────────────┐
-│ @hiero-hackers/enterprise-core│  │@hiero-hackers/enterprise-mirror│
+│  enterprise-core      │  │  enterprise-mirror     │
 │  SDK write-side       │  │  REST read-side        │
 │  Account / File /     │  │  9 repositories        │
 │  Token / Contract /   │  │  pagination + filters  │
@@ -182,7 +207,7 @@ export class BalanceController {
 
 `@hiero-hackers/enterprise-mirror` owns the REST read-side and has **zero dependencies** — analytics consumers can install it alone, with no SDK and no credentials. 
 
-Framework adapters compose both behind one surface. Either package also works standalone.
+Use either package on its own, or both together.
 
 Writes go through the Hiero SDK — transactions that go on-chain, signed by the operator. Reads go through the mirror node, which doesn't cost fees and returns historical or indexed data.
 
@@ -230,8 +255,7 @@ const transfers = await collectAll(
 ```
 
 See the [mirror package README](./packages/mirror/README.md) for the full
-guide. Framework adapters compose core + mirror automatically, so
-`req.hiero.accountRepository` etc. keep working unchanged.
+guide.
 
 ## Samples
 
@@ -240,9 +264,13 @@ Working examples are in [`samples/`](./samples). Each one is a minimal but real 
 | Sample | Framework |
 |--------|-----------|
 | [examples](./samples/examples) | Standalone `@hiero-hackers/enterprise-core` scripts |
-| [express-sample](./samples/express-sample) | Express |
-| [fastify-sample](./samples/fastify-sample) | Fastify |
-| [nest-sample](./samples/nest-sample) | NestJS |
+| [express-sample](./samples/express-sample) | Express, using core + mirror directly |
+| [fastify-sample](./samples/fastify-sample) | Fastify, using core + mirror directly |
+| [nest-sample](./samples/nest-sample) | NestJS, using core + mirror directly |
+
+## Changelog
+
+Notable changes for each release are recorded in [CHANGELOG.md](./CHANGELOG.md).
 
 ## Contributing
 
@@ -273,12 +301,13 @@ All five packages are versioned **in lockstep**: one version number, one tag. Th
    pnpm install --frozen-lockfile && pnpm -r run build
    pnpm -r publish --dry-run --no-git-checks
    ```
-4. Open a PR with the bump, get it reviewed, and merge to `main`.
-5. From the merged commit on `main`, push a **signed** tag that matches the version (note the `v` prefix):
+4. In [`CHANGELOG.md`](./CHANGELOG.md), rename the `[Unreleased]` heading to the new version and date, add a fresh empty `[Unreleased]` section above it, and update the comparison links at the bottom.
+5. Open a PR with the bump and changelog, get it reviewed, and merge to `main`.
+6. From the merged commit on `main`, push a **signed** tag that matches the version (note the `v` prefix):
    ```bash
    git tag -s v0.3.0 -m "v0.3.0" && git push origin v0.3.0
    ```
-6. Watch the **Release** workflow in the Actions tab. On success, all five packages are live on npm at the new version.
+7. Watch the **Release** workflow in the Actions tab. On success, all five packages are live on npm at the new version.
 
 **Notes**
 

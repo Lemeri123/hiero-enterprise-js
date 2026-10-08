@@ -26,7 +26,23 @@ import { createHieroRuntime } from "./runtime.js";
 
 // ─── Injection Tokens ──────────────────────────────────────────
 
+/**
+ * Injection token for the resolved config.
+ *
+ * @deprecated `@hiero-hackers/enterprise-nest` is deprecated and will be
+ * removed in a future release. Use `@hiero-hackers/enterprise-core` and
+ * `@hiero-hackers/enterprise-mirror` directly — see the migration guide
+ * in the repository README.
+ */
 export const HIERO_CONFIG = "HIERO_CONFIG";
+/**
+ * Injection token for the shared `HieroContext`.
+ *
+ * @deprecated `@hiero-hackers/enterprise-nest` is deprecated and will be
+ * removed in a future release. Use `@hiero-hackers/enterprise-core` and
+ * `@hiero-hackers/enterprise-mirror` directly — see the migration guide
+ * in the repository README.
+ */
 export const HIERO_CONTEXT = "HIERO_CONTEXT";
 const HIERO_RUNTIME = "HIERO_RUNTIME";
 
@@ -60,6 +76,11 @@ type NestImport =
 
 /**
  * Options for async configuration of HieroModule.
+ *
+ * @deprecated `@hiero-hackers/enterprise-nest` is deprecated and will be
+ * removed in a future release. Use `@hiero-hackers/enterprise-core` and
+ * `@hiero-hackers/enterprise-mirror` directly — see the migration guide
+ * in the repository README.
  */
 export interface HieroModuleAsyncOptions {
     /** Imports needed for config injection */
@@ -106,6 +127,11 @@ export interface HieroModuleAsyncOptions {
  * })
  * export class AppModule {}
  * ```
+ *
+ * @deprecated `@hiero-hackers/enterprise-nest` is deprecated and will be
+ * removed in a future release. Use `@hiero-hackers/enterprise-core` and
+ * `@hiero-hackers/enterprise-mirror` directly — see the migration guide
+ * in the repository README.
  */
 @Module({})
 export class HieroModule {
@@ -189,30 +215,7 @@ export class HieroModule {
     }
 }
 
-// Re-export the DI-token classes. Symbols already imported above are
-// exported as local bindings; the rest re-export from their package.
-export {
-    AccountService,
-    ScheduleService,
-    FileService,
-    TokenService,
-    ContractService,
-    TopicService,
-    MirrorNodeClient,
-};
-export { AccountType, OperatorKeyType } from "@hiero-hackers/enterprise-core";
-export {
-    AccountRepository,
-    NftRepository,
-    TokenRepository,
-    TopicRepository,
-    TransactionRepository,
-    NetworkRepository,
-    ScheduleRepository,
-    BlockRepository,
-    ContractRepository,
-} from "@hiero-hackers/enterprise-mirror";
-export type { HieroConfig } from "@hiero-hackers/enterprise-core";
+export * from "./reexports.js";
 export type { HieroAdapterConfig };
 export type { HieroServices } from "./runtime.js";
 

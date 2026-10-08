@@ -1,5 +1,15 @@
 # @hiero-hackers/enterprise-nest
 
+> [!WARNING]
+> **Deprecated.** This package will be removed in a future release and
+> logs a one-time `DeprecationWarning` (code
+> `HIERO_ENTERPRISE_NEST_DEPRECATED`) when it is first used.
+> Use [`@hiero-hackers/enterprise-core`](../core) and
+> [`@hiero-hackers/enterprise-mirror`](../mirror) directly instead: see
+> [Migrating from the framework adapters](../../README.md#migrating-from-the-framework-adapters)
+> and the [NestJS sample](../../samples/nest-sample), which shows the
+> replacement in a few lines.
+
 NestJS module for Hiero. **This is the only package you install** — it
 composes `@hiero-hackers/enterprise-core` (write-side SDK services) and
 `@hiero-hackers/enterprise-mirror` (read-side REST repositories) and registers
