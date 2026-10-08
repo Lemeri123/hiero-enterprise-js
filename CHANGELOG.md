@@ -52,7 +52,7 @@ All published packages (`@hiero-hackers/enterprise-core`, `-mirror`, `-express`,
 
 - `enterprise-core`: `HieroContext` no longer leaks an SDK client when the
   operator credentials are invalid, and a malformed `operatorId` now throws a
-  `HieroError` with `CONFIG_INVALID` instead of a raw SDK error ([#246]).
+  `HieroError` with `CONFIG_INVALID` instead of a raw SDK error (#246).
 
 ### Security
 
@@ -246,4 +246,3 @@ npm registry ([#126], [#133]).
 [#201]: https://github.com/hiero-hackers/hiero-enterprise-js/pull/201
 [#212]: https://github.com/hiero-hackers/hiero-enterprise-js/pull/212
 [#238]: https://github.com/hiero-hackers/hiero-enterprise-js/issues/238
-[#246]: https://github.com/hiero-hackers/hiero-enterprise-js/issues/246
