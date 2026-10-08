@@ -335,6 +335,30 @@ describe("HieroContext", () => {
             }
         });
 
+        it("still runs later listeners when a listener throws an unprintable value", async () => {
+            const emitWarning = vi
+                .spyOn(process, "emitWarning")
+                .mockImplementation(() => undefined);
+            try {
+                const ctx = new HieroContext(validConfig);
+                const later = { onAfterTransaction: vi.fn() };
+                ctx.addTransactionListener({
+                    onAfterTransaction: () => {
+                        throw Object.create(null);
+                    },
+                });
+                ctx.addTransactionListener(later);
+
+                await expect(
+                    ctx.emitAfterTransaction(event),
+                ).resolves.toBeUndefined();
+                expect(later.onAfterTransaction).toHaveBeenCalledWith(event);
+                expect(emitWarning).toHaveBeenCalledTimes(1);
+            } finally {
+                emitWarning.mockRestore();
+            }
+        });
+
         it("propagates a throwing onBeforeTransaction listener so it can veto the transaction", async () => {
             const ctx = new HieroContext(validConfig);
             ctx.addTransactionListener({

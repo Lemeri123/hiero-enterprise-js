@@ -33,11 +33,19 @@ function parsePrivateKey(key: string, keyType: string): PrivateKey {
  * Report an `onAfterTransaction` error without affecting the outcome.
  */
 function reportListenerError(event: TransactionEvent, error: unknown): void {
-    const message = error instanceof Error ? error.message : String(error);
     process.emitWarning(
-        `onAfterTransaction listener threw for ${event.serviceName}.${event.methodName}: ${message}`,
+        `onAfterTransaction listener threw for ${event.serviceName}.${event.methodName}: ${describeError(error)}`,
         { type: "HieroListenerWarning", code: "HIERO_LISTENER_ERROR" },
     );
+}
+
+/** Stringify a thrown value; listeners may throw values that cannot be. */
+function describeError(error: unknown): string {
+    try {
+        return error instanceof Error ? String(error.message) : String(error);
+    } catch {
+        return "unprintable value";
+    }
 }
 
 /**
