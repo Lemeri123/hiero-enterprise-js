@@ -70,12 +70,7 @@ export class FileInfoQuery {
         const info = await this.executor.run(
             () => new SdkFileInfoQuery().setFileId(fileId),
             options,
-            {
-                type: "FileInfoQuery",
-                serviceName: "FileService",
-                methodName: "getFileInfo",
-                timestamp: new Date(),
-            },
+            "FileService.getFileInfo",
         );
 
         return {

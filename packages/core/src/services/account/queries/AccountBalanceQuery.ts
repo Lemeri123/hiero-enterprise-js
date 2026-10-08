@@ -20,12 +20,7 @@ export class AccountBalanceQuery {
         const balance = await this.executor.run(
             () => new SdkAccountBalanceQuery().setAccountId(accountId),
             options,
-            {
-                type: "AccountBalanceQuery",
-                serviceName: "AccountService",
-                methodName: "getAccountBalance",
-                timestamp: new Date(),
-            },
+            "AccountService.getAccountBalance",
         );
 
         const tokens = [];

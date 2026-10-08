@@ -7,7 +7,6 @@ import {
     HieroContext,
     type IHieroContext,
 } from "../../../../src/context/index.js";
-import type { TransactionEvent } from "../../../../src/listeners/index.js";
 
 interface MockQuery {
     setPaymentTransactionId: ReturnType<typeof vi.fn>;
@@ -27,12 +26,7 @@ function buildMockQuery(): MockQuery {
     };
 }
 
-const SAMPLE_EVENT: TransactionEvent = {
-    type: "NetworkVersionInfoQuery",
-    serviceName: "NetworkService",
-    methodName: "getNetworkVersionInfo",
-    timestamp: new Date(0),
-};
+const CONTEXT = "NetworkService.getNetworkVersionInfo";
 
 describe("QueryExecutor", () => {
     let context: IHieroContext;
@@ -48,7 +42,7 @@ describe("QueryExecutor", () => {
 
     describe("applyBaseOptions", () => {
         it("does not call any setters when options are empty", async () => {
-            await executor.run(query as never, {}, SAMPLE_EVENT);
+            await executor.run(query as never, {}, CONTEXT);
 
             expect(query.setPaymentTransactionId).not.toHaveBeenCalled();
             expect(query.setMaxQueryPayment).not.toHaveBeenCalled();
@@ -60,7 +54,7 @@ describe("QueryExecutor", () => {
             await executor.run(
                 query as never,
                 { payerAccountId: "0.0.500" },
-                SAMPLE_EVENT,
+                CONTEXT,
             );
 
             expect(query.setPaymentTransactionId).toHaveBeenCalledTimes(1);
@@ -76,7 +70,7 @@ describe("QueryExecutor", () => {
             await executor.run(
                 query as never,
                 { payerAccountId: payer },
-                SAMPLE_EVENT,
+                CONTEXT,
             );
 
             const txId = query.setPaymentTransactionId.mock
@@ -85,11 +79,7 @@ describe("QueryExecutor", () => {
         });
 
         it("coerces a numeric maxQueryPayment into an Hbar", async () => {
-            await executor.run(
-                query as never,
-                { maxQueryPayment: 2 },
-                SAMPLE_EVENT,
-            );
+            await executor.run(query as never, { maxQueryPayment: 2 }, CONTEXT);
 
             const arg = query.setMaxQueryPayment.mock.calls[0][0] as Hbar;
             expect(arg).toBeInstanceOf(Hbar);
@@ -102,18 +92,14 @@ describe("QueryExecutor", () => {
             await executor.run(
                 query as never,
                 { maxQueryPayment: fee },
-                SAMPLE_EVENT,
+                CONTEXT,
             );
 
             expect(query.setMaxQueryPayment).toHaveBeenCalledWith(fee);
         });
 
         it("coerces a numeric queryPayment into an Hbar", async () => {
-            await executor.run(
-                query as never,
-                { queryPayment: 1 },
-                SAMPLE_EVENT,
-            );
+            await executor.run(query as never, { queryPayment: 1 }, CONTEXT);
 
             const arg = query.setQueryPayment.mock.calls[0][0] as Hbar;
             expect(arg).toBeInstanceOf(Hbar);
@@ -124,7 +110,7 @@ describe("QueryExecutor", () => {
             await executor.run(
                 query as never,
                 { nodeAccountIds: ["0.0.3", "0.0.4"] },
-                SAMPLE_EVENT,
+                CONTEXT,
             );
 
             expect(query.setNodeAccountIds).toHaveBeenCalledTimes(1);
@@ -136,70 +122,29 @@ describe("QueryExecutor", () => {
         });
 
         it("ignores an empty nodeAccountIds array", async () => {
-            await executor.run(
-                query as never,
-                { nodeAccountIds: [] },
-                SAMPLE_EVENT,
-            );
+            await executor.run(query as never, { nodeAccountIds: [] }, CONTEXT);
 
             expect(query.setNodeAccountIds).not.toHaveBeenCalled();
         });
     });
 
-    describe("lifecycle", () => {
-        it("emits before, executes, then emits after with success status", async () => {
-            const calls: string[] = [];
-            (
-                context.emitBeforeTransaction as ReturnType<typeof vi.fn>
-            ).mockImplementation(() => {
-                calls.push("before");
-                return Promise.resolve();
-            });
-            query.execute.mockImplementation(() => {
-                calls.push("execute");
-                return Promise.resolve("query-result");
-            });
-            (
-                context.emitAfterTransaction as ReturnType<typeof vi.fn>
-            ).mockImplementation(() => {
-                calls.push("after");
-                return Promise.resolve();
-            });
-
-            const result = await executor.run(query as never, {}, SAMPLE_EVENT);
-
-            expect(calls).toEqual(["before", "execute", "after"]);
-            expect(result).toBe("query-result");
-        });
-
-        it("forwards the event metadata to before emit unchanged", async () => {
-            await executor.run(query as never, {}, SAMPLE_EVENT);
-
-            expect(context.emitBeforeTransaction).toHaveBeenCalledWith(
-                SAMPLE_EVENT,
-            );
-        });
-
-        it("enriches the after event with SUCCESS status and duration", async () => {
-            await executor.run(query as never, {}, SAMPLE_EVENT);
-
-            expect(context.emitAfterTransaction).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    type: SAMPLE_EVENT.type,
-                    serviceName: SAMPLE_EVENT.serviceName,
-                    methodName: SAMPLE_EVENT.methodName,
-                    status: "SUCCESS",
-                    durationMs: expect.any(Number),
-                }),
-            );
-        });
-
+    describe("execution", () => {
         it("returns the query's resolved value", async () => {
             query.execute.mockResolvedValueOnce({ custom: "payload" });
 
-            const result = await executor.run(query as never, {}, SAMPLE_EVENT);
+            const result = await executor.run(query as never, {}, CONTEXT);
 
             expect(result).toEqual({ custom: "payload" });
+        });
+
+        it("builds the query from a builder function", async () => {
+            const result = await executor.run(
+                () => query as never,
+                {},
+                CONTEXT,
+            );
+
+            expect(result).toBe("query-result");
         });
     });
 
@@ -209,52 +154,50 @@ describe("QueryExecutor", () => {
             query.execute.mockRejectedValueOnce(original);
 
             await expect(
-                executor.run(query as never, {}, SAMPLE_EVENT),
-            ).rejects.toBeInstanceOf(HieroError);
-
-            query.execute.mockRejectedValueOnce(original);
-            await expect(
-                executor.run(query as never, {}, SAMPLE_EVENT),
+                executor.run(query as never, {}, CONTEXT),
             ).rejects.toMatchObject({
-                context: "NetworkService.getNetworkVersionInfo",
+                constructor: HieroError,
+                context: CONTEXT,
                 cause: original,
             });
         });
 
-        it("emits an after event carrying the original error before throwing", async () => {
-            const original = new Error("boom");
-            query.execute.mockRejectedValueOnce(original);
+        it("normalises an error thrown while building the query", async () => {
+            const invalidId = new Error("invalid format for entity ID");
 
             await expect(
-                executor.run(query as never, {}, SAMPLE_EVENT),
-            ).rejects.toThrow();
-
-            expect(context.emitAfterTransaction).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    error: original,
-                    durationMs: expect.any(Number),
-                }),
-            );
+                executor.run(
+                    () => {
+                        throw invalidId;
+                    },
+                    {},
+                    CONTEXT,
+                ),
+            ).rejects.toMatchObject({
+                constructor: HieroError,
+                context: CONTEXT,
+                cause: invalidId,
+            });
         });
 
-        it("wraps a non-Error rejection into an Error for the after event", async () => {
-            query.execute.mockRejectedValueOnce("string failure");
-
+        it("normalises an invalid nodeAccountIds entry", async () => {
             await expect(
-                executor.run(query as never, {}, SAMPLE_EVENT),
-            ).rejects.toThrow();
-
-            const afterCall = (
-                context.emitAfterTransaction as ReturnType<typeof vi.fn>
-            ).mock.calls[0][0];
-            expect(afterCall.error).toBeInstanceOf(Error);
-            expect((afterCall.error as Error).message).toBe("string failure");
+                executor.run(
+                    query as never,
+                    { nodeAccountIds: ["bad"] },
+                    CONTEXT,
+                ),
+            ).rejects.toBeInstanceOf(HieroError);
+            expect(query.execute).not.toHaveBeenCalled();
         });
     });
 
-    describe("run() — listener failures", () => {
+    describe("transaction listeners", () => {
         let ctx: HieroContext;
-        let emitWarning: ReturnType<typeof vi.spyOn>;
+        const listener = {
+            onBeforeTransaction: vi.fn(),
+            onAfterTransaction: vi.fn(),
+        };
 
         beforeEach(() => {
             ctx = new HieroContext({
@@ -264,62 +207,29 @@ describe("QueryExecutor", () => {
                 operatorKey:
                     "302e020100300506032b6570042204203b054ddd0c62d577ce0fbb0e92dcce0d5bea42a98a5c9663271939881ce19208",
             });
-            ctx.addTransactionListener({
-                onAfterTransaction: () => {
-                    throw new Error("listener bug");
-                },
-            });
-            emitWarning = vi
-                .spyOn(process, "emitWarning")
-                .mockImplementation(() => undefined);
+            ctx.addTransactionListener(listener);
         });
 
         afterEach(() => {
-            emitWarning.mockRestore();
             ctx.close();
         });
 
-        it("emits the after-event once when emitting the success event fails", async () => {
-            vi.mocked(context.emitAfterTransaction).mockRejectedValueOnce(
-                new Error("listener bug"),
-            );
+        it("are not notified of a successful query", async () => {
+            await new QueryExecutor(ctx).run(query as never, {}, CONTEXT);
 
-            await executor
-                .run(query as never, {}, SAMPLE_EVENT)
+            expect(listener.onBeforeTransaction).not.toHaveBeenCalled();
+            expect(listener.onAfterTransaction).not.toHaveBeenCalled();
+        });
+
+        it("are not notified of a failed query", async () => {
+            query.execute.mockRejectedValueOnce(new Error("query failed"));
+
+            await new QueryExecutor(ctx)
+                .run(query as never, {}, CONTEXT)
                 .catch(() => undefined);
 
-            expect(context.emitAfterTransaction).toHaveBeenCalledTimes(1);
-        });
-
-        it("returns the result when an onAfterTransaction listener throws", async () => {
-            await expect(
-                new QueryExecutor(ctx).run(query as never, {}, SAMPLE_EVENT),
-            ).resolves.toBe("query-result");
-        });
-
-        it("still runs when an onBeforeTransaction listener throws", async () => {
-            ctx.addTransactionListener({
-                onBeforeTransaction: () => {
-                    throw new Error("metrics backend down");
-                },
-            });
-
-            const result = await new QueryExecutor(ctx).run(
-                query as never,
-                {},
-                SAMPLE_EVENT,
-            );
-
-            expect(result).toBe("query-result");
-        });
-
-        it("keeps the original error when an onAfterTransaction listener throws", async () => {
-            const original = new Error("query exploded");
-            query.execute.mockRejectedValueOnce(original);
-
-            await expect(
-                new QueryExecutor(ctx).run(query as never, {}, SAMPLE_EVENT),
-            ).rejects.toMatchObject({ cause: original });
+            expect(listener.onBeforeTransaction).not.toHaveBeenCalled();
+            expect(listener.onAfterTransaction).not.toHaveBeenCalled();
         });
     });
 });

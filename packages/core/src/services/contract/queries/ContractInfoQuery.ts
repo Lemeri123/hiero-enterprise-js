@@ -25,12 +25,7 @@ export class ContractInfoQuery {
         return await this.executor.run(
             () => new SdkContractInfoQuery().setContractId(contractId),
             options,
-            {
-                type: "ContractInfoQuery",
-                serviceName: "ContractService",
-                methodName: "getContractInfo",
-                timestamp: new Date(),
-            },
+            "ContractService.getContractInfo",
         );
     }
 }

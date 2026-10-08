@@ -79,12 +79,7 @@ export class TopicInfoQuery {
         const info = await this.executor.run(
             () => new SdkTopicInfoQuery().setTopicId(topicId),
             options,
-            {
-                type: "TopicInfoQuery",
-                serviceName: "TopicService",
-                methodName: "getTopicInfo",
-                timestamp: new Date(),
-            },
+            "TopicService.getTopicInfo",
         );
 
         return {

@@ -33,12 +33,7 @@ export class FileContentsQuery {
         return await this.executor.run(
             () => new SdkFileContentsQuery().setFileId(fileId),
             options,
-            {
-                type: "FileContentsQuery",
-                serviceName: "FileService",
-                methodName: "getFileContents",
-                timestamp: new Date(),
-            },
+            "FileService.getFileContents",
         );
     }
 }

@@ -131,12 +131,7 @@ export class TokenInfoQuery {
         const info = await this.executor.run(
             () => new SdkTokenInfoQuery().setTokenId(tokenId),
             options,
-            {
-                type: "TokenInfoQuery",
-                serviceName: "TokenService",
-                methodName: "getTokenInfo",
-                timestamp: new Date(),
-            },
+            "TokenService.getTokenInfo",
         );
 
         return {

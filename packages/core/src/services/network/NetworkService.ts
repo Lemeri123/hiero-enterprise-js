@@ -103,13 +103,11 @@ export class NetworkService {
             query.setIncludeDuplicates(options.includeDuplicates);
         }
 
-        return await this.queryExecutor.run(query, options, {
-            type: "TransactionReceiptQuery",
-            serviceName: "NetworkService",
-            methodName: "getTransactionReceipt",
-            timestamp: new Date(),
-            transactionId: txId.toString(),
-        });
+        return await this.queryExecutor.run(
+            query,
+            options,
+            "NetworkService.getTransactionReceipt",
+        );
     }
 
     /**
@@ -144,13 +142,11 @@ export class NetworkService {
             query.setIncludeDuplicates(options.includeDuplicates);
         }
 
-        return await this.queryExecutor.run(query, options, {
-            type: "TransactionRecordQuery",
-            serviceName: "NetworkService",
-            methodName: "getTransactionRecord",
-            timestamp: new Date(),
-            transactionId: txId.toString(),
-        });
+        return await this.queryExecutor.run(
+            query,
+            options,
+            "NetworkService.getTransactionRecord",
+        );
     }
 
     /**
@@ -166,11 +162,10 @@ export class NetworkService {
     ): Promise<NetworkVersionInfo> {
         const query = new NetworkVersionInfoQuery();
 
-        return await this.queryExecutor.run(query, options, {
-            type: "NetworkVersionInfoQuery",
-            serviceName: "NetworkService",
-            methodName: "getNetworkVersionInfo",
-            timestamp: new Date(),
-        });
+        return await this.queryExecutor.run(
+            query,
+            options,
+            "NetworkService.getNetworkVersionInfo",
+        );
     }
 }

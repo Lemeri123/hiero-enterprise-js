@@ -69,12 +69,7 @@ export class ScheduleInfoQuery {
         const info = await this.executor.run(
             () => new SdkScheduleInfoQuery().setScheduleId(scheduleId),
             options,
-            {
-                type: "ScheduleInfoQuery",
-                serviceName: "ScheduleService",
-                methodName: "getInfo",
-                timestamp: new Date(),
-            },
+            "ScheduleService.getInfo",
         );
 
         const isExecuted = info.executed !== null;

@@ -25,12 +25,7 @@ export class ContractBytecodeQuery {
         return await this.executor.run(
             () => new SdkContractByteCodeQuery().setContractId(contractId),
             options,
-            {
-                type: "ContractByteCodeQuery",
-                serviceName: "ContractService",
-                methodName: "getContractBytecode",
-                timestamp: new Date(),
-            },
+            "ContractService.getContractBytecode",
         );
     }
 }

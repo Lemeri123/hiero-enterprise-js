@@ -70,12 +70,11 @@ export class ContractCallQuery {
     ): Promise<ContractFunctionResult> {
         this.validate(options);
 
-        return await this.executor.run(() => this.build(options), options, {
-            type: "ContractCallQuery",
-            serviceName: "ContractService",
-            methodName: "callContract",
-            timestamp: new Date(),
-        });
+        return await this.executor.run(
+            () => this.build(options),
+            options,
+            "ContractService.callContract",
+        );
     }
 
     private build(options: ContractCallQueryOptions): SdkContractCallQuery {

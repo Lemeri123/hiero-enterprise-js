@@ -94,12 +94,7 @@ export class AccountSignatureQuery {
         const info = await this.executor.run(
             () => new SdkAccountInfoQuery().setAccountId(accountId),
             options,
-            {
-                type: "AccountInfoQuery",
-                serviceName: "AccountService",
-                methodName,
-                timestamp: new Date(),
-            },
+            `AccountService.${methodName}`,
         );
 
         if (!(info.key instanceof PublicKey)) {

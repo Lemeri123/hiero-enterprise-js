@@ -67,12 +67,7 @@ export class TokenNftInfoQuery {
         const infos = await this.executor.run(
             () => new SdkTokenNftInfoQuery().setNftId(nftId),
             options,
-            {
-                type: "TokenNftInfoQuery",
-                serviceName: "TokenService",
-                methodName: "getNftInfo",
-                timestamp: new Date(),
-            },
+            "TokenService.getNftInfo",
         );
 
         const info = infos[0];

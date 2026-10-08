@@ -13,15 +13,16 @@ import {
 } from "../../src/services/index.js";
 import type { QueryOptions } from "../../src/services/index.js";
 
-// Every service query must go through QueryExecutor: listener events,
-// QueryOptions and error normalisation. Real SDK queries are built; only
-// Query.execute (the network call) is stubbed.
+// Every service query must go through QueryExecutor: QueryOptions and
+// error normalisation, and no transaction listener events (queries are not
+// transactions). Real SDK queries are built; only Query.execute (the
+// network call) is stubbed.
 
 const OPTIONS: QueryOptions = { nodeAccountIds: ["0.0.3"] };
 
 type Call = (ctx: HieroContext) => Promise<unknown>;
 
-const cases: Array<[type: string, service: string, method: string, Call]> = [
+const cases: Array<[query: string, service: string, method: string, Call]> = [
     [
         "AccountBalanceQuery",
         "AccountService",
@@ -172,7 +173,7 @@ describe("query routing through QueryExecutor", () => {
 
     it.each(cases)(
         "%s via %s.%s",
-        async (type, serviceName, methodName, call) => {
+        async (_query, serviceName, methodName, call) => {
             const error = await call(ctx).catch((e: unknown) => e);
 
             expect(error).toBeInstanceOf(HieroError);
@@ -180,17 +181,8 @@ describe("query routing through QueryExecutor", () => {
                 context: `${serviceName}.${methodName}`,
             });
             expect(sent()?.nodeAccountIds?.map(String)).toEqual(["0.0.3"]);
-            expect(listener.onBeforeTransaction).toHaveBeenCalledWith(
-                expect.objectContaining({ type, serviceName, methodName }),
-            );
-            expect(listener.onAfterTransaction).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    type,
-                    error: expect.objectContaining({
-                        message: "node unavailable",
-                    }),
-                }),
-            );
+            expect(listener.onBeforeTransaction).not.toHaveBeenCalled();
+            expect(listener.onAfterTransaction).not.toHaveBeenCalled();
         },
     );
 });
