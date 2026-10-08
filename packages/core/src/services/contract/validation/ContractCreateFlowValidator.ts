@@ -77,11 +77,19 @@ export class ContractCreateFlowValidator {
         const value = options.initialBalance;
         if (value == null) return;
 
+        // The SDK treats a bigint as 0 HBAR, so reject it.
+        if (typeof value === "bigint") {
+            throw normalizeError(
+                new Error(
+                    "initialBalance must be a number, string, Long, BigNumber or Hbar, not a bigint.",
+                ),
+                "ContractCreateFlowValidator",
+            );
+        }
+
         let isNegative;
         if (typeof value === "number") {
             isNegative = value < 0;
-        } else if (typeof value === "bigint") {
-            isNegative = value < 0n;
         } else if (typeof value === "string") {
             isNegative = parseFloat(value) < 0;
         } else if (Long.isLong(value)) {

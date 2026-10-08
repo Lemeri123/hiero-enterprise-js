@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import type { TokenId } from "@hiero-ledger/sdk";
+import type { AccountId, TokenId } from "@hiero-ledger/sdk";
 import { NftId } from "@hiero-ledger/sdk";
 import { setupIntegrationTestEnv } from "../../../utils/env.js";
 import {
@@ -16,12 +16,12 @@ import {
     TokenService,
 } from "../../../../src/services/index.js";
 
-function tokenBalanceFor(
-    balance: { tokens: { tokenId: string; balance: string }[] },
+async function tokenBalanceFor(
+    accountService: AccountService,
+    accountId: string | AccountId,
     tokenId: string | TokenId,
-): string | undefined {
-    return balance.tokens.find((t) => t.tokenId === tokenId.toString())
-        ?.balance;
+): Promise<string> {
+    return (await accountService.getTokenBalance(accountId, tokenId)).balance;
 }
 
 describe("TokenService reject operations [Integration]", () => {
@@ -68,12 +68,9 @@ describe("TokenService reject operations [Integration]", () => {
         await waitForMirrorNodeRecord();
 
         // Sanity: holder owns the transferred amount, treasury debited.
-        const holderBefore = await accountService.getAccountBalance(
-            holder.accountId,
-        );
-        expect(tokenBalanceFor(holderBefore, tokenId)).toBe(
-            String(transferAmount),
-        );
+        expect(
+            await tokenBalanceFor(accountService, holder.accountId, tokenId),
+        ).toBe(String(transferAmount));
 
         await tokenService.rejectTokensFlow({
             ownerId: holder.accountId,
@@ -94,13 +91,9 @@ describe("TokenService reject operations [Integration]", () => {
         expect(
             holderTokens.find((t) => t.token_id === tokenId.toString()),
         ).toBeUndefined();
-
-        const treasuryBalance = await accountService.getAccountBalance(
-            owner.accountId,
-        );
-        expect(tokenBalanceFor(treasuryBalance, tokenId)).toBe(
-            String(initialSupply),
-        );
+        expect(
+            await tokenBalanceFor(accountService, owner.accountId, tokenId),
+        ).toBe(String(initialSupply));
     });
 
     it("rejects NFT serials, returning them to the treasury and dissociating the holder", async () => {
@@ -161,12 +154,12 @@ describe("TokenService reject operations [Integration]", () => {
         );
 
         await waitForMirrorNodeRecord();
-
-        const holderBefore = await accountService.getAccountBalance(
-            holder.accountId,
-        );
-        expect(tokenBalanceFor(holderBefore, tokenIdA)).toBe("1");
-        expect(tokenBalanceFor(holderBefore, tokenIdB)).toBe("1");
+        expect(
+            await tokenBalanceFor(accountService, holder.accountId, tokenIdA),
+        ).toBe("1");
+        expect(
+            await tokenBalanceFor(accountService, holder.accountId, tokenIdB),
+        ).toBe("1");
 
         await tokenService.rejectTokensFlow({
             ownerId: holder.accountId,
@@ -189,12 +182,12 @@ describe("TokenService reject operations [Integration]", () => {
         expect(
             holderTokens.find((t) => t.token_id === tokenIdB.toString()),
         ).toBeUndefined();
-
-        const treasuryBalance = await accountService.getAccountBalance(
-            owner.accountId,
-        );
-        expect(tokenBalanceFor(treasuryBalance, tokenIdA)).toBe("1");
-        expect(tokenBalanceFor(treasuryBalance, tokenIdB)).toBe("1");
+        expect(
+            await tokenBalanceFor(accountService, owner.accountId, tokenIdA),
+        ).toBe("1");
+        expect(
+            await tokenBalanceFor(accountService, owner.accountId, tokenIdB),
+        ).toBe("1");
     });
 
     it("rejects fungible tokens and NFT serials in a single call", async () => {
@@ -275,13 +268,16 @@ describe("TokenService reject operations [Integration]", () => {
         ).toBeUndefined();
 
         // Treasury supply has been restored for both.
-        const treasuryBalance = await accountService.getAccountBalance(
-            owner.accountId,
-        );
-        expect(tokenBalanceFor(treasuryBalance, fungibleTokenId)).toBe(
-            String(fungibleSupply),
-        );
-        expect(tokenBalanceFor(treasuryBalance, nftTokenId)).toBe("2");
+        expect(
+            await tokenBalanceFor(
+                accountService,
+                owner.accountId,
+                fungibleTokenId,
+            ),
+        ).toBe(String(fungibleSupply));
+        expect(
+            await tokenBalanceFor(accountService, owner.accountId, nftTokenId),
+        ).toBe("2");
     });
 
     it("throws when neither fungibleTokenIds nor nftIds is supplied", async () => {

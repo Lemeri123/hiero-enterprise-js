@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import {
-    AccountBalanceQuery,
+    MirrorNodeAccountBalanceQuery,
     type Client,
     ContractCallQuery,
     ContractFunctionParameters,
     Hbar,
 } from "@hiero-ledger/sdk";
 import { setupIntegrationTestEnv } from "../../../utils/env.js";
+import { waitForMirrorNodeRecord } from "../../../utils/mirror-node.js";
 import { ContractService } from "../../../../src/services/index.js";
 
 /**
@@ -44,13 +45,14 @@ async function getStoredValue(
     return result.getUint256(0).toNumber();
 }
 
-/** Returns the contract's HBAR balance via `AccountBalanceQuery`. */
+/** Returns the contract's HBAR balance from the mirror node. */
 async function getContractHbarBalance(
     client: Client,
     contractId: string,
 ): Promise<Hbar> {
-    const balance = await new AccountBalanceQuery()
-        .setContractId(contractId)
+    await waitForMirrorNodeRecord();
+    const balance = await new MirrorNodeAccountBalanceQuery()
+        .setAccountId(contractId)
         .execute(client);
     return balance.hbars;
 }

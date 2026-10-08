@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import type { TokenId } from "@hiero-ledger/sdk";
+import type { AccountId, TokenId } from "@hiero-ledger/sdk";
 import { setupIntegrationTestEnv } from "../../../utils/env.js";
 import { waitForMirrorNodeRecord } from "../../../utils/mirror-node.js";
 import {
@@ -11,12 +11,12 @@ import {
     TokenService,
 } from "../../../../src/services/index.js";
 
-function tokenBalanceFor(
-    balance: { tokens: { tokenId: string; balance: string }[] },
+async function tokenBalanceFor(
+    accountService: AccountService,
+    accountId: string | AccountId,
     tokenId: string | TokenId,
-): string | undefined {
-    return balance.tokens.find((t) => t.tokenId === tokenId.toString())
-        ?.balance;
+): Promise<string> {
+    return (await accountService.getTokenBalance(accountId, tokenId)).balance;
 }
 
 describe("TokenService airdrop operations [Integration]", () => {
@@ -87,10 +87,13 @@ describe("TokenService airdrop operations [Integration]", () => {
         ];
 
         for (const { receiver, balance } of expectations) {
-            const accountBalance = await accountService.getAccountBalance(
-                receiver.accountId,
-            );
-            expect(tokenBalanceFor(accountBalance, tokenId)).toBe(balance);
+            expect(
+                await tokenBalanceFor(
+                    accountService,
+                    receiver.accountId,
+                    tokenId,
+                ),
+            ).toBe(balance);
         }
     });
 
@@ -123,10 +126,9 @@ describe("TokenService airdrop operations [Integration]", () => {
 
         // Pending airdrops are not credited until the receiver claims them,
         // so the account balance query should not list the token.
-        const accountBalance = await accountService.getAccountBalance(
-            receiver.accountId,
-        );
-        expect(tokenBalanceFor(accountBalance, tokenId)).toBeUndefined();
+        expect(
+            await tokenBalanceFor(accountService, receiver.accountId, tokenId),
+        ).toBe("0");
     });
 
     it("batches a mix of immediate-credit and pending airdrops in one transaction", async () => {
@@ -168,15 +170,19 @@ describe("TokenService airdrop operations [Integration]", () => {
         });
 
         await waitForMirrorNodeRecord();
-
-        const associatedBalance = await accountService.getAccountBalance(
-            associatedReceiver.accountId,
-        );
-        expect(tokenBalanceFor(associatedBalance, tokenId)).toBe("7");
-
-        const pendingBalance = await accountService.getAccountBalance(
-            pendingReceiver.accountId,
-        );
-        expect(tokenBalanceFor(pendingBalance, tokenId)).toBeUndefined();
+        expect(
+            await tokenBalanceFor(
+                accountService,
+                associatedReceiver.accountId,
+                tokenId,
+            ),
+        ).toBe("7");
+        expect(
+            await tokenBalanceFor(
+                accountService,
+                pendingReceiver.accountId,
+                tokenId,
+            ),
+        ).toBe("0");
     });
 });

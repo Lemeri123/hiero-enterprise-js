@@ -1,5 +1,5 @@
 import type { AccountId, TokenId, Transaction, Hbar } from "@hiero-ledger/sdk";
-import type { Account, Balance } from "../../types/index.js";
+import type { Account, Balance, TokenBalance } from "../../types/index.js";
 import type { IHieroContext } from "../../context/index.js";
 import { normalizeError } from "../../errors/index.js";
 import {
@@ -34,7 +34,11 @@ import type {
     ScheduleTransferTokenOptions,
     ScheduleTransferNftOptions,
 } from "./operations/index.js";
-import { AccountBalanceQuery, AccountSignatureQuery } from "./queries/index.js";
+import {
+    AccountBalanceQuery,
+    AccountSignatureQuery,
+    TokenBalanceQuery,
+} from "./queries/index.js";
 import type {
     QueryOptions,
     ScheduleOptions,
@@ -55,6 +59,7 @@ export class AccountService {
     private readonly deleteAllNftAllowancesOperation: DeleteAllNftAllowancesOperation;
     private readonly transferOperation: TransferOperation;
     private readonly balanceQuery: AccountBalanceQuery;
+    private readonly tokenBalanceQuery: TokenBalanceQuery;
     private readonly signatureQuery: AccountSignatureQuery;
 
     constructor(private readonly context: IHieroContext) {
@@ -68,6 +73,7 @@ export class AccountService {
             new DeleteAllNftAllowancesOperation(context);
         this.transferOperation = new TransferOperation(context);
         this.balanceQuery = new AccountBalanceQuery(context);
+        this.tokenBalanceQuery = new TokenBalanceQuery(context);
         this.signatureQuery = new AccountSignatureQuery(context);
     }
 
@@ -225,30 +231,39 @@ export class AccountService {
     }
 
     /**
-     * Get the balance of an account.
+     * Get the HBAR balance of an account from the mirror node. A newly
+     * created account reads as `INVALID_ACCOUNT_ID` until the mirror node
+     * has ingested it, typically a few seconds.
      *
      * @param accountId - Account to query
-     * @param options - Optional query options (payer, payment caps, node targeting)
-     * @returns The account balance
+     * @returns The account's HBAR balance
      */
-    async getAccountBalance(
-        accountId: string | AccountId,
-        options?: QueryOptions,
-    ): Promise<Balance> {
-        return await this.balanceQuery.execute(accountId, options);
+    async getAccountBalance(accountId: string | AccountId): Promise<Balance> {
+        return await this.balanceQuery.execute(accountId);
     }
 
     /**
-     * Get the balance of the operator account.
+     * Get an account's balance of one token from the mirror node. An
+     * account that doesn't hold the token returns a balance of `"0"`.
      *
-     * @param options - Optional query options (payer, payment caps, node targeting)
-     * @returns The operator account balance
+     * @param accountId - Account to query
+     * @param tokenId - Token whose balance to read
+     * @returns The token balance, in the token's smallest unit
      */
-    async getOperatorAccountBalance(options?: QueryOptions): Promise<Balance> {
-        return await this.balanceQuery.execute(
-            this.context.operatorAccountId,
-            options,
-        );
+    async getTokenBalance(
+        accountId: string | AccountId,
+        tokenId: string | TokenId,
+    ): Promise<TokenBalance> {
+        return await this.tokenBalanceQuery.execute(accountId, tokenId);
+    }
+
+    /**
+     * Get the HBAR balance of the operator account from the mirror node.
+     *
+     * @returns The operator account's HBAR balance
+     */
+    async getOperatorAccountBalance(): Promise<Balance> {
+        return await this.balanceQuery.execute(this.context.operatorAccountId);
     }
 
     /**
