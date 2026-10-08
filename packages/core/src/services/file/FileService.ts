@@ -398,6 +398,11 @@ function splitContents(
  * makes clear that the initial create/update succeeded but subsequent
  * append failed, leaving the file with partial contents.
  *
+ * **Observer errors**: If the append succeeded on-chain but a listener
+ * threw (identifiable by `ResultMappingFailed` code), the file is NOT
+ * partial—avoid claiming incomplete contents. In that case, preserve
+ * the outcome-uncertain messaging from the original error.
+ *
  * @param error - The raw append error
  * @param fileId - The file entity ID
  * @param context - Operation context (e.g., "FileService.createFile")
@@ -412,7 +417,21 @@ function wrapAppendFailure(
 ): HieroError {
     const normalized = normalizeError(error, context);
     const fileIdStr = typeof fileId === "string" ? fileId : fileId.toString();
+    if (normalized.code === HieroErrorCodes.ResultMappingFailed) {
+        return new HieroError(
+            `File ${fileIdStr} ${actionVerb}, and the append transaction succeeded, but a post-transaction observer failed: ${normalized.message}`,
+            {
+                code: normalized.code,
+                sdkStatus: normalized.sdkStatus,
+                context,
+                cause: normalized.cause ?? normalized,
+                transactionId: normalized.transactionId,
+                fileId: fileIdStr,
+            },
+        );
+    }
 
+    // Normal append failure: file is left with partial contents
     return new HieroError(
         `File ${fileIdStr} ${actionVerb}, but appending the remainder of its contents failed: ${normalized.message}`,
         {
