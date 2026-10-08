@@ -19,7 +19,6 @@ describe("FileService [partial content failure]", () => {
             // Create > 4 KiB payload to trigger split
             const largeContents = Buffer.alloc(5000, "x");
 
-            // Mock createOperation to succeed and return a fileId
             const mockFileId = { toString: () => "0.0.12345" };
             vi.spyOn(
                 service["createOperation"],
@@ -29,11 +28,11 @@ describe("FileService [partial content failure]", () => {
                 status: "SUCCESS",
             } as any);
 
-            // Mock appendOperation to fail
             const appendError = new Error("Missing required signatures");
-            vi.spyOn(service["appendOperation"], "execute").mockRejectedValueOnce(
-                appendError,
-            );
+            vi.spyOn(
+                service["appendOperation"],
+                "execute",
+            ).mockRejectedValueOnce(appendError);
 
             const error = await service
                 .createFile({ contents: largeContents })
@@ -54,8 +53,7 @@ describe("FileService [partial content failure]", () => {
             const smallContents = Buffer.alloc(100, "x");
 
             const mockFileId = { toString: () => "0.0.12346" };
-            
-            // Set up spies before calling the method
+
             const appendSpy = vi.spyOn(service["appendOperation"], "execute");
             vi.spyOn(
                 service["createOperation"],
@@ -65,10 +63,11 @@ describe("FileService [partial content failure]", () => {
                 status: "SUCCESS",
             } as any);
 
-            const result = await service.createFile({ contents: smallContents });
+            const result = await service.createFile({
+                contents: smallContents,
+            });
 
             expect(result.fileId).toBe(mockFileId);
-            // Append should not be called for small contents
             expect(appendSpy).not.toHaveBeenCalled();
         });
     });
@@ -78,7 +77,6 @@ describe("FileService [partial content failure]", () => {
             const largeContents = Buffer.alloc(5000, "y");
             const fileId = "0.0.67890";
 
-            // Mock updateOperation to succeed
             vi.spyOn(
                 service["updateOperation"],
                 "execute",
@@ -86,11 +84,11 @@ describe("FileService [partial content failure]", () => {
                 status: "SUCCESS",
             } as any);
 
-            // Mock appendOperation to fail
             const appendError = new Error("Insufficient transaction fee");
-            vi.spyOn(service["appendOperation"], "execute").mockRejectedValueOnce(
-                appendError,
-            );
+            vi.spyOn(
+                service["appendOperation"],
+                "execute",
+            ).mockRejectedValueOnce(appendError);
 
             const error = await service
                 .updateFile({ fileId, contents: largeContents })
@@ -111,7 +109,6 @@ describe("FileService [partial content failure]", () => {
             const smallContents = Buffer.alloc(100, "y");
             const fileId = "0.0.67891";
 
-            // Set up spies before calling the method
             const appendSpy = vi.spyOn(service["appendOperation"], "execute");
             vi.spyOn(
                 service["updateOperation"],
@@ -122,14 +119,12 @@ describe("FileService [partial content failure]", () => {
 
             await service.updateFile({ fileId, contents: smallContents });
 
-            // Append should not be called for small contents
             expect(appendSpy).not.toHaveBeenCalled();
         });
 
         it("does not attempt append when contents is undefined", async () => {
             const fileId = "0.0.67892";
 
-            // Set up spies before calling the method
             const appendSpy = vi.spyOn(service["appendOperation"], "execute");
             vi.spyOn(
                 service["updateOperation"],
@@ -156,14 +151,14 @@ describe("FileService [partial content failure]", () => {
                 status: "SUCCESS",
             } as any);
 
-            // Simulate SDK ReceiptStatusError with transactionId
             const sdkError = new Error("INVALID_SIGNATURE") as any;
             sdkError.status = { toString: () => "INVALID_SIGNATURE" };
             sdkError.transactionId = { toString: () => "0.0.2@1234567890.000" };
 
-            vi.spyOn(service["appendOperation"], "execute").mockRejectedValueOnce(
-                sdkError,
-            );
+            vi.spyOn(
+                service["appendOperation"],
+                "execute",
+            ).mockRejectedValueOnce(sdkError);
 
             await expect(
                 service.updateFile({ fileId, contents: largeContents }),

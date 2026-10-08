@@ -411,8 +411,7 @@ function wrapAppendFailure(
     actionVerb: string,
 ): HieroError {
     const normalized = normalizeError(error, context);
-    const fileIdStr =
-        typeof fileId === "string" ? fileId : fileId.toString();
+    const fileIdStr = typeof fileId === "string" ? fileId : fileId.toString();
 
     return new HieroError(
         `File ${fileIdStr} ${actionVerb}, but appending the remainder of its contents failed: ${normalized.message}`,
