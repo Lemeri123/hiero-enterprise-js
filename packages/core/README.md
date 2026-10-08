@@ -57,5 +57,44 @@ arguments to read the environment: `HIERO_NETWORK`,
 (`ed25519` | `ecdsa` | `der` — required, since key algorithms cannot be
 reliably auto-detected from the raw key string).
 
+## Balances
+
+Balances are read from the mirror node, as the consensus nodes no longer
+serve balance queries:
+
+```ts
+const accounts = new AccountService(context);
+const { tinybars } = await accounts.getAccountBalance("0.0.1234");
+const { balance, decimals } = await accounts.getTokenBalance(
+  "0.0.1234",
+  "0.0.5678",
+);
+```
+
+A new account or transfer appears on the mirror node a few seconds after
+it reaches consensus.
+
+## Custom networks
+
+For a network other than mainnet, testnet or previewnet (for example a
+local Solo network), pass its consensus nodes as `networkNodes` (or
+`HIERO_NETWORK_NODES="127.0.0.1:50211=0.0.3"`) and point the client at
+its mirror node:
+
+```ts
+const context = new HieroContext({
+  network: "local",
+  networkNodes: { "127.0.0.1:50211": "0.0.3" },
+  operatorId: "0.0.2",
+  operatorKey: "302e...",
+  operatorKeyType: "der",
+});
+context.client.setMirrorNetwork(["localhost:5600"]);
+```
+
+The mirror network is needed for balances and topic subscriptions. The
+SDK reads a local mirror node's REST API on port 5551. See
+[`custom-network.ts`](../../samples/examples/src/network/custom-network.ts).
+
 Runnable examples for every service:
 [`samples/examples`](../../samples/examples).

@@ -47,16 +47,20 @@ import {
     PrivateKey,
     TokenService,
     type TokenId,
-    type Balance,
+    type AccountId,
 } from "@hiero-hackers/enterprise-core";
-import { getED25519Config } from "../env.js";
+import {
+    getED25519Config,
+    setLocalMirrorNetwork,
+    waitForMirror,
+} from "../env.js";
 
-function tokenBalanceFor(
-    balance: Balance,
+async function tokenBalanceFor(
+    accountService: AccountService,
+    accountId: string | AccountId,
     tokenId: string | TokenId,
-): string | undefined {
-    return balance.tokens.find((t) => t.tokenId === tokenId.toString())
-        ?.balance;
+): Promise<string> {
+    return (await accountService.getTokenBalance(accountId, tokenId)).balance;
 }
 
 async function createKeyedAccount(
@@ -129,13 +133,10 @@ async function cancelPendingFungibleAirdrop(
         additionalSigners: [owner.key],
     });
 
-    const afterCancel = await accountService.getAccountBalance(
-        receiver.accountId,
-    );
+    await waitForMirror();
     console.log(
         "  Receiver balance after cancel:",
-        tokenBalanceFor(afterCancel, tokenId) ??
-            "<no relationship — pending airdrop cancelled>",
+        await tokenBalanceFor(accountService, receiver.accountId, tokenId),
     );
     console.log();
 }
@@ -199,13 +200,10 @@ async function cancelPendingNftAirdrop(
         additionalSigners: [owner.key],
     });
 
-    const afterCancel = await accountService.getAccountBalance(
-        receiver.accountId,
-    );
+    await waitForMirror();
     console.log(
         "  Receiver NFT count after cancel:",
-        tokenBalanceFor(afterCancel, tokenId) ??
-            "<no relationship — pending airdrop cancelled>",
+        await tokenBalanceFor(accountService, receiver.accountId, tokenId),
     );
     console.log();
 }
@@ -298,25 +296,26 @@ async function cancelMixedBatch(
         additionalSigners: [owner.key],
     });
 
-    const afterCancel = await accountService.getAccountBalance(
-        receiver.accountId,
-    );
+    await waitForMirror();
 
     console.log(
         "  Receiver fungible balance after cancel:",
-        tokenBalanceFor(afterCancel, fungibleTokenId) ??
-            "<no relationship — pending airdrop cancelled>",
+        await tokenBalanceFor(
+            accountService,
+            receiver.accountId,
+            fungibleTokenId,
+        ),
     );
     console.log(
         "  Receiver NFT count after cancel:",
-        tokenBalanceFor(afterCancel, nftTokenId) ??
-            "<no relationship — pending airdrop cancelled>",
+        await tokenBalanceFor(accountService, receiver.accountId, nftTokenId),
     );
     console.log();
 }
 
 async function main() {
     const context = new HieroContext(getED25519Config());
+    setLocalMirrorNetwork(context);
     const accountService = new AccountService(context);
     const tokenService = new TokenService(context);
 

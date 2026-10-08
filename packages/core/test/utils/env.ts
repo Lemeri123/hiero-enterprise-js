@@ -23,6 +23,12 @@ export function wait(ms: number): Promise<void> {
 export function setupIntegrationTestEnv(): HieroContext {
     const ctx = new HieroContext();
 
+    // A custom network (e.g. Solo) has no built-in mirror node; balance
+    // queries and topic subscriptions need one.
+    if (ctx.config.networkNodes) {
+        ctx.client.setMirrorNetwork([MIRROR_GRPC_ADDRESS]);
+    }
+
     // Attach tracker to automatically hook the generated ID
     ctx.addTransactionListener({
         onAfterTransaction: (event) => {

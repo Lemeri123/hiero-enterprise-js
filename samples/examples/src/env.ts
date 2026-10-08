@@ -1,4 +1,4 @@
-import type { HieroConfig } from "@hiero-hackers/enterprise-core";
+import type { HieroConfig, HieroContext } from "@hiero-hackers/enterprise-core";
 
 /**
  * Parse HIERO_NETWORK_NODES env var.
@@ -46,4 +46,25 @@ export function getEcdsaExampleConfig(): HieroConfig {
         operatorKeyType: "ecdsa",
         networkNodes: parseNetworkNodes(process.env["HIERO_NETWORK_NODES"]),
     };
+}
+
+/** Solo's mirror node gRPC endpoint. */
+const LOCAL_MIRROR_NETWORK = "localhost:5600";
+
+/**
+ * Point a custom network's client at its mirror node, which balance
+ * queries read from. Mainnet, testnet and previewnet already know theirs.
+ */
+export function setLocalMirrorNetwork(context: HieroContext): void {
+    if (context.config.networkNodes) {
+        context.client.setMirrorNetwork([LOCAL_MIRROR_NETWORK]);
+    }
+}
+
+/**
+ * Give the mirror node a few seconds to ingest the latest transaction
+ * before reading a balance from it.
+ */
+export function waitForMirror(): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, 5000));
 }

@@ -33,7 +33,7 @@
  * Run: pnpm tsx src/token/claim-airdrop.ts
  */
 
-import type { TokenId } from "@hiero-hackers/enterprise-core";
+import type { AccountId, TokenId } from "@hiero-hackers/enterprise-core";
 import {
     AccountService,
     AccountType,
@@ -42,16 +42,19 @@ import {
     PendingAirdropId,
     PrivateKey,
     TokenService,
-    type Balance,
 } from "@hiero-hackers/enterprise-core";
-import { getED25519Config } from "../env.js";
+import {
+    getED25519Config,
+    setLocalMirrorNetwork,
+    waitForMirror,
+} from "../env.js";
 
-function tokenBalanceFor(
-    balance: Balance,
+async function tokenBalanceFor(
+    accountService: AccountService,
+    accountId: string | AccountId,
     tokenId: string | TokenId,
-): string | undefined {
-    return balance.tokens.find((t) => t.tokenId === tokenId.toString())
-        ?.balance;
+): Promise<string> {
+    return (await accountService.getTokenBalance(accountId, tokenId)).balance;
 }
 
 async function createKeyedAccount(
@@ -105,14 +108,11 @@ async function claimPendingFungibleAirdrop(
         additionalSigners: [owner.key],
     });
 
-    const beforeClaim = await accountService.getAccountBalance(
-        receiver.accountId,
-    );
+    await waitForMirror();
     console.log("Token:", tokenId);
     console.log(
         "  Receiver balance before claim:",
-        tokenBalanceFor(beforeClaim, tokenId) ??
-            "<no relationship — pending airdrop>",
+        await tokenBalanceFor(accountService, receiver.accountId, tokenId),
     );
 
     // The receiver finalises the pending airdrop. Their key must sign.
@@ -127,12 +127,10 @@ async function claimPendingFungibleAirdrop(
         additionalSigners: [receiver.key],
     });
 
-    const afterClaim = await accountService.getAccountBalance(
-        receiver.accountId,
-    );
+    await waitForMirror();
     console.log(
         "  Receiver balance after claim:",
-        tokenBalanceFor(afterClaim, tokenId) ?? "0",
+        await tokenBalanceFor(accountService, receiver.accountId, tokenId),
     );
     console.log();
 }
@@ -177,14 +175,11 @@ async function claimPendingNftAirdrop(
         additionalSigners: [owner.key],
     });
 
-    const beforeClaim = await accountService.getAccountBalance(
-        receiver.accountId,
-    );
+    await waitForMirror();
     console.log("Collection:", tokenId);
     console.log(
         "  Receiver NFT count before claim:",
-        tokenBalanceFor(beforeClaim, tokenId) ??
-            "<no relationship — pending airdrop>",
+        await tokenBalanceFor(accountService, receiver.accountId, tokenId),
     );
 
     // The receiver finalises the pending NFT airdrop. Their key must sign.
@@ -199,12 +194,10 @@ async function claimPendingNftAirdrop(
         additionalSigners: [receiver.key],
     });
 
-    const afterClaim = await accountService.getAccountBalance(
-        receiver.accountId,
-    );
+    await waitForMirror();
     console.log(
         "  Receiver NFT count after claim:",
-        tokenBalanceFor(afterClaim, tokenId) ?? "0",
+        await tokenBalanceFor(accountService, receiver.accountId, tokenId),
     );
     console.log();
 }
@@ -289,25 +282,28 @@ async function claimMixedBatch(
         additionalSigners: [receiver.key],
     });
 
-    const afterClaim = await accountService.getAccountBalance(
-        receiver.accountId,
-    );
+    await waitForMirror();
 
     console.log("Fungible token:", fungibleTokenId);
     console.log(
         "  Receiver balance after claim:",
-        tokenBalanceFor(afterClaim, fungibleTokenId) ?? "0",
+        await tokenBalanceFor(
+            accountService,
+            receiver.accountId,
+            fungibleTokenId,
+        ),
     );
     console.log("NFT collection:", nftTokenId);
     console.log(
         "  Receiver NFT count after claim:",
-        tokenBalanceFor(afterClaim, nftTokenId) ?? "0",
+        await tokenBalanceFor(accountService, receiver.accountId, nftTokenId),
     );
     console.log();
 }
 
 async function main() {
     const context = new HieroContext(getED25519Config());
+    setLocalMirrorNetwork(context);
     const accountService = new AccountService(context);
     const tokenService = new TokenService(context);
 

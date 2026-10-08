@@ -1,49 +1,54 @@
-import type { AccountId } from "@hiero-ledger/sdk";
-import { AccountBalanceQuery as SdkAccountBalanceQuery } from "@hiero-ledger/sdk";
-import type { Balance } from "../../../types/index.js";
+import type { AccountId, TokenId } from "@hiero-ledger/sdk";
+import {
+    MirrorNodeAccountBalanceQuery,
+    MirrorNodeTokenBalanceQuery,
+} from "@hiero-ledger/sdk";
+import type { Balance, TokenBalance } from "../../../types/index.js";
 import type { IHieroContext } from "../../../context/index.js";
 import { normalizeError } from "../../../errors/index.js";
-import { QueryExecutor } from "../../transaction/index.js";
-import type { QueryOptions } from "../../transaction/index.js";
 
+/**
+ * Reads account balances from the mirror node. The client needs a mirror
+ * network: built in for mainnet, testnet and previewnet, set with
+ * `context.client.setMirrorNetwork([...])` for a custom network.
+ */
 export class AccountBalanceQuery {
-    private readonly executor: QueryExecutor;
+    constructor(private readonly context: IHieroContext) {}
 
-    constructor(context: IHieroContext) {
-        this.executor = new QueryExecutor(context);
-    }
-
-    /** Get account balance execute handler. */
-    async execute(
-        accountId: string | AccountId,
-        options: QueryOptions = {},
-    ): Promise<Balance> {
+    /** Get the HBAR balance of an account. */
+    async execute(accountId: string | AccountId): Promise<Balance> {
         try {
-            const query = new SdkAccountBalanceQuery().setAccountId(accountId);
-            const balance = await this.executor.run(query, options, {
-                type: "AccountBalanceQuery",
-                serviceName: "AccountService",
-                methodName: "getAccountBalance",
-                timestamp: new Date(),
-            });
-            const tokens = [];
-            if (balance.tokens) {
-                for (const [tokenId, amount] of balance.tokens) {
-                    tokens.push({
-                        tokenId: tokenId.toString(),
-                        balance: amount.toString(),
-                        decimals: balance.tokenDecimals?.get(tokenId) ?? 0,
-                    });
-                }
-            }
+            const balance = await new MirrorNodeAccountBalanceQuery()
+                .setAccountId(accountId)
+                .execute(this.context.client);
 
             return {
                 accountId: accountId.toString(),
                 tinybars: balance.hbars.toTinybars().toString(),
-                tokens,
             };
         } catch (error) {
             throw normalizeError(error, "AccountService.getAccountBalance");
+        }
+    }
+
+    /** Get an account's balance of one token. */
+    async executeTokenBalance(
+        accountId: string | AccountId,
+        tokenId: string | TokenId,
+    ): Promise<TokenBalance> {
+        try {
+            const balance = await new MirrorNodeTokenBalanceQuery()
+                .setAccountId(accountId)
+                .setTokenId(tokenId)
+                .execute(this.context.client);
+
+            return {
+                tokenId: balance.tokenId.toString(),
+                balance: balance.balance.toString(),
+                decimals: balance.decimals,
+            };
+        } catch (error) {
+            throw normalizeError(error, "AccountService.getTokenBalance");
         }
     }
 }

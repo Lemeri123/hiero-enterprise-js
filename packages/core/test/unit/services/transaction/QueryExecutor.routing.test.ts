@@ -23,18 +23,6 @@ type Call = (ctx: HieroContext) => Promise<unknown>;
 
 const cases: Array<[query: string, service: string, method: string, Call]> = [
     [
-        "AccountBalanceQuery",
-        "AccountService",
-        "getAccountBalance",
-        (ctx) => new AccountService(ctx).getAccountBalance("0.0.98", OPTIONS),
-    ],
-    [
-        "AccountBalanceQuery",
-        "AccountService",
-        "getAccountBalance",
-        (ctx) => new AccountService(ctx).getOperatorAccountBalance(OPTIONS),
-    ],
-    [
         "AccountInfoQuery",
         "AccountService",
         "verifyAccountSignature",
@@ -153,12 +141,6 @@ describe("query routing through QueryExecutor", () => {
     // HieroError with the method's context.
     it.each([
         [
-            "AccountService.getAccountBalance",
-            {},
-            (c: HieroContext) =>
-                new AccountService(c).getAccountBalance("0.0.98"),
-        ],
-        [
             "FileService.getFileInfo",
             {},
             (c: HieroContext) => new FileService(c).getFileInfo("0.0.150"),
@@ -196,20 +178,20 @@ describe("query routing through QueryExecutor", () => {
     );
 
     it("reports an invalid ID as a HieroError without reaching the network", async () => {
-        const error = await new AccountService(ctx)
-            .getAccountBalance("not-an-id")
+        const error = await new TokenService(ctx)
+            .getTokenInfo("not-an-id")
             .catch((e: unknown) => e);
 
         expect(error).toBeInstanceOf(HieroError);
         expect(error).toMatchObject({
-            context: "AccountService.getAccountBalance",
+            context: "TokenService.getTokenInfo",
         });
         expect(execute).not.toHaveBeenCalled();
     });
 
     it("reports an invalid nodeAccountIds entry as a HieroError", async () => {
-        const error = await new AccountService(ctx)
-            .getAccountBalance("0.0.98", { nodeAccountIds: ["bad"] })
+        const error = await new TokenService(ctx)
+            .getTokenInfo("0.0.6", { nodeAccountIds: ["bad"] })
             .catch((e: unknown) => e);
 
         expect(error).toBeInstanceOf(HieroError);
