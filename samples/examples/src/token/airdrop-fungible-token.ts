@@ -34,11 +34,7 @@ import {
     PrivateKey,
     TokenService,
 } from "@hiero-hackers/enterprise-core";
-import {
-    getED25519Config,
-    setLocalMirrorNetwork,
-    waitForMirror,
-} from "../env.js";
+import { getED25519Config, waitForMirror } from "../env.js";
 
 async function tokenBalanceFor(
     accountService: AccountService,
@@ -259,7 +255,6 @@ async function mixedBatch(
 
 async function main() {
     const context = new HieroContext(getED25519Config());
-    setLocalMirrorNetwork(context);
     const accountService = new AccountService(context);
     const tokenService = new TokenService(context);
 

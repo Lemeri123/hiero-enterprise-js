@@ -1,4 +1,4 @@
-import type { HieroConfig, HieroContext } from "@hiero-hackers/enterprise-core";
+import type { HieroConfig } from "@hiero-hackers/enterprise-core";
 
 /**
  * Parse HIERO_NETWORK_NODES env var.
@@ -19,6 +19,19 @@ function parseNetworkNodes(raw?: string): Record<string, string> | undefined {
 }
 
 /**
+ * Parse HIERO_MIRROR_NETWORK env var.
+ * Format: "host:port,host:port"
+ * Example: "localhost:5600"
+ */
+function parseMirrorNetwork(raw?: string): string[] | undefined {
+    const addresses = raw
+        ?.split(",")
+        .map((address) => address.trim())
+        .filter((address) => address.length > 0);
+    return addresses?.length ? addresses : undefined;
+}
+
+/**
  * Build a HieroConfig from environment variables with sensible defaults
  * for local development. Used by all example scripts.
  *
@@ -31,6 +44,8 @@ export function getED25519Config(): HieroConfig {
         operatorKey: process.env["HIERO_ED25519_OPERATOR_KEY"]!,
         operatorKeyType: "ed25519",
         networkNodes: parseNetworkNodes(process.env["HIERO_NETWORK_NODES"]),
+        mirrorNetwork: parseMirrorNetwork(process.env["HIERO_MIRROR_NETWORK"]),
+        mirrorNodeUrl: process.env["HIERO_MIRROR_NODE_URL"],
     };
 }
 
@@ -45,20 +60,9 @@ export function getEcdsaExampleConfig(): HieroConfig {
         operatorKey: process.env["HIERO_ECDSA_OPERATOR_KEY"]!,
         operatorKeyType: "ecdsa",
         networkNodes: parseNetworkNodes(process.env["HIERO_NETWORK_NODES"]),
+        mirrorNetwork: parseMirrorNetwork(process.env["HIERO_MIRROR_NETWORK"]),
+        mirrorNodeUrl: process.env["HIERO_MIRROR_NODE_URL"],
     };
-}
-
-/** Solo's mirror node gRPC endpoint. */
-const LOCAL_MIRROR_NETWORK = "localhost:5600";
-
-/**
- * Point a custom network's client at its mirror node, which balance
- * queries read from. Mainnet, testnet and previewnet already know theirs.
- */
-export function setLocalMirrorNetwork(context: HieroContext): void {
-    if (context.config.networkNodes) {
-        context.client.setMirrorNetwork([LOCAL_MIRROR_NETWORK]);
-    }
 }
 
 /**

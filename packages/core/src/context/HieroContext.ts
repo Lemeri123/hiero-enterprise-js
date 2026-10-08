@@ -1,6 +1,12 @@
 import { HieroErrorCodes, HieroError } from "../errors/index.js";
-import type { Transaction } from "@hiero-ledger/sdk";
-import { Client, AccountId, PrivateKey } from "@hiero-ledger/sdk";
+import type { HttpTransport, Transaction } from "@hiero-ledger/sdk";
+import {
+    Client,
+    AccountId,
+    PrivateKey,
+    DefaultHttpTransport,
+    HttpRequest,
+} from "@hiero-ledger/sdk";
 import type { HieroConfig } from "../config/index.js";
 import { resolveConfigFromEnv, assertEnvConfigValid } from "../config/index.js";
 import { OperatorKeyType } from "../types/index.js";
@@ -27,6 +33,26 @@ function parsePrivateKey(key: string, keyType: string): PrivateKey {
                 { code: HieroErrorCodes.ConfigInvalid },
             );
     }
+}
+
+/**
+ * Parse the origin of the mirror node REST URL (e.g., "http://localhost:5551").
+ */
+function parseMirrorNodeOrigin(url: string): string {
+    let origin: string | undefined;
+    try {
+        origin = new URL(url).origin;
+    } catch {
+        // Reported below.
+    }
+    // "localhost:5551" parses as a URL with the opaque origin "null".
+    if (!origin || origin === "null") {
+        throw new HieroError(
+            `Invalid mirrorNodeUrl "${url}". Expected a URL such as "http://localhost:5551".`,
+            { code: HieroErrorCodes.ConfigInvalid },
+        );
+    }
+    return origin;
 }
 
 /**
@@ -81,6 +107,9 @@ export class HieroContext implements IHieroContext {
     /** The operator account ID */
     public readonly operatorAccountId: AccountId;
 
+    /** The transport created for `mirrorNodeUrl`; the SDK never closes it */
+    private mirrorNodeTransport?: HttpTransport;
+
     constructor(config?: HieroConfig) {
         if (!config) {
             assertEnvConfigValid();
@@ -117,6 +146,10 @@ export class HieroContext implements IHieroContext {
             );
         }
 
+        const mirrorNodeOrigin = resolved.mirrorNodeUrl
+            ? parseMirrorNodeOrigin(resolved.mirrorNodeUrl)
+            : undefined;
+
         // Resolve network
         const network = resolved.network.toLowerCase();
         if (network === "mainnet" || network === "hedera-mainnet") {
@@ -142,6 +175,13 @@ export class HieroContext implements IHieroContext {
         }
 
         this.client.setOperator(this.operatorAccountId, this._operatorKey);
+
+        if (resolved.mirrorNetwork) {
+            this.client.setMirrorNetwork(resolved.mirrorNetwork);
+        }
+        if (mirrorNodeOrigin) {
+            this.useMirrorNodeOrigin(mirrorNodeOrigin);
+        }
 
         // Apply SDK client tuning options
         this.applyTimeouts(resolved.requestTimeoutMs, resolved.grpcDeadlineMs);
@@ -181,6 +221,35 @@ export class HieroContext implements IHieroContext {
     }
 
     /**
+     * Send mirror REST calls to `origin`. The SDK derives the REST URL from
+     * the mirror network and has no setting for it, so rewrite each request.
+     */
+    private useMirrorNodeOrigin(origin: string): void {
+        const httpConfig = this.client.getMirrorNodeHttpConfig();
+        const transport = DefaultHttpTransport.create(
+            httpConfig.transportConfiguration,
+        );
+        this.mirrorNodeTransport = transport;
+
+        this.client.setMirrorNodeHttpConfig({
+            ...httpConfig,
+            transport: {
+                roundTrip: (request, signal) => {
+                    const { pathname, search } = new URL(request.url);
+                    return transport.roundTrip(
+                        new HttpRequest({
+                            ...request,
+                            url: origin + pathname + search,
+                        }),
+                        signal,
+                    );
+                },
+                close: (closeTimeout) => transport.close(closeTimeout),
+            },
+        });
+    }
+
+    /**
      * Get the operator's public key (safe to expose).
      */
     public get operatorPublicKey() {
@@ -200,6 +269,7 @@ export class HieroContext implements IHieroContext {
      */
     public close(): void {
         this.client.close();
+        void this.mirrorNodeTransport?.close();
     }
 
     // Transaction Listener Management

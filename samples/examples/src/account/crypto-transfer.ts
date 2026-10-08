@@ -28,11 +28,7 @@ import {
     PrivateKey,
     Hbar,
 } from "@hiero-hackers/enterprise-core";
-import {
-    getED25519Config,
-    setLocalMirrorNetwork,
-    waitForMirror,
-} from "../env.js";
+import { getED25519Config, waitForMirror } from "../env.js";
 
 /**
  * Demonstrates a direct HBAR transfer between two accounts.
@@ -423,7 +419,6 @@ async function scheduleTransferNft(
 
 async function main() {
     const context = new HieroContext(getED25519Config());
-    setLocalMirrorNetwork(context);
     const accountService = new AccountService(context);
     const tokenService = new TokenService(context);
     try {

@@ -3,8 +3,9 @@ import { HieroError, HieroErrorCodes } from "../errors/index.js";
 /**
  * Configuration for connecting to a Hiero network.
  *
- * Mirror node REST configuration lives in `@hiero-hackers/enterprise-mirror`
- * (`MirrorConfig`) — this config covers the SDK/consensus side only.
+ * The mirror node fields here are the ones the SDK uses itself (balances,
+ * topic subscriptions). The `@hiero-hackers/enterprise-mirror` client has
+ * its own `MirrorConfig`.
  */
 export interface HieroConfig {
     /** Network to connect to (e.g., "testnet", "mainnet", "previewnet", or custom) */
@@ -21,6 +22,17 @@ export interface HieroConfig {
      * Required for custom/local networks where node discovery is unavailable.
      */
     readonly networkNodes?: Record<string, string>;
+    /**
+     * Mirror node gRPC addresses for custom networks (e.g., ["localhost:5600"]).
+     * Mainnet, testnet and previewnet already know theirs.
+     */
+    readonly mirrorNetwork?: string[];
+    /**
+     * Mirror node REST URL (e.g., "http://localhost:5551"). Balances are read
+     * from it. Without it the SDK derives the URL from the mirror network,
+     * using port 5551 for a local mirror node.
+     */
+    readonly mirrorNodeUrl?: string;
     /** Request timeout in milliseconds (default: 120000) */
     readonly requestTimeoutMs?: number;
     /** gRPC deadline in milliseconds (default: 10000) */
@@ -42,6 +54,8 @@ export interface HieroConfig {
  *   HIERO_OPERATOR_KEY
  *   HIERO_OPERATOR_KEY_TYPE
  *   HIERO_NETWORK_NODES
+ *   HIERO_MIRROR_NETWORK
+ *   HIERO_MIRROR_NODE_URL
  *
  * @returns A HieroConfig or null if required env vars are missing
  */
@@ -76,12 +90,20 @@ export function resolveConfigFromEnv(): HieroConfig | null {
         networkNodes = Object.fromEntries(parsed);
     }
 
+    // Parse HIERO_MIRROR_NETWORK: "host:port,host:port"
+    const mirrorNetwork = process.env["HIERO_MIRROR_NETWORK"]
+        ?.split(",")
+        .map((address) => address.trim())
+        .filter((address) => address.length > 0);
+
     return {
         network,
         operatorId,
         operatorKey,
         operatorKeyType,
         networkNodes,
+        mirrorNetwork: mirrorNetwork?.length ? mirrorNetwork : undefined,
+        mirrorNodeUrl: process.env["HIERO_MIRROR_NODE_URL"] || undefined,
     };
 }
 

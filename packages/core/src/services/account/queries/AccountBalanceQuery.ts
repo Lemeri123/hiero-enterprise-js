@@ -5,9 +5,8 @@ import type { IHieroContext } from "../../../context/index.js";
 import { normalizeError } from "../../../errors/index.js";
 
 /**
- * Reads an account's HBAR balance from the mirror node. The client needs a
- * mirror network: built in for mainnet, testnet and previewnet, set with
- * `context.client.setMirrorNetwork([...])` for a custom network.
+ * Reads an account's HBAR balance from the mirror node. Custom networks
+ * need `mirrorNetwork` and `mirrorNodeUrl` set in the config.
  */
 export class AccountBalanceQuery {
     constructor(private readonly context: IHieroContext) {}

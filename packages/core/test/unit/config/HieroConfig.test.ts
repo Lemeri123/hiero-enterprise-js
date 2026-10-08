@@ -52,4 +52,35 @@ describe("resolveConfigFromEnv", () => {
         });
         process.env = env;
     });
+
+    it("parses HIERO_MIRROR_NETWORK and HIERO_MIRROR_NODE_URL", () => {
+        process.env = {
+            HIERO_NETWORK: "local",
+            HIERO_OPERATOR_ID: "0.0.1",
+            HIERO_OPERATOR_KEY: "key123",
+            HIERO_OPERATOR_KEY_TYPE: "ed25519",
+            HIERO_MIRROR_NETWORK: "localhost:5600, localhost:5601",
+            HIERO_MIRROR_NODE_URL: "http://localhost:5551",
+        };
+        expect(resolveConfigFromEnv()).toMatchObject({
+            mirrorNetwork: ["localhost:5600", "localhost:5601"],
+            mirrorNodeUrl: "http://localhost:5551",
+        });
+        process.env = env;
+    });
+
+    it("leaves the mirror fields unset when their env vars are empty", () => {
+        process.env = {
+            HIERO_NETWORK: "local",
+            HIERO_OPERATOR_ID: "0.0.1",
+            HIERO_OPERATOR_KEY: "key123",
+            HIERO_OPERATOR_KEY_TYPE: "ed25519",
+            HIERO_MIRROR_NETWORK: "",
+            HIERO_MIRROR_NODE_URL: "",
+        };
+        const config = resolveConfigFromEnv();
+        expect(config?.mirrorNetwork).toBeUndefined();
+        expect(config?.mirrorNodeUrl).toBeUndefined();
+        process.env = env;
+    });
 });

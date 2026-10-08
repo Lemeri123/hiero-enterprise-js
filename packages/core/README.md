@@ -77,23 +77,30 @@ it reaches consensus.
 ## Custom networks
 
 For a network other than mainnet, testnet or previewnet (for example a
-local Solo network), pass its consensus nodes as `networkNodes` (or
-`HIERO_NETWORK_NODES="127.0.0.1:50211=0.0.3"`) and point the client at
-its mirror node:
+local Solo network), pass its consensus nodes and its mirror node:
 
 ```ts
 const context = new HieroContext({
   network: "local",
   networkNodes: { "127.0.0.1:50211": "0.0.3" },
+  mirrorNetwork: ["localhost:5600"],
+  mirrorNodeUrl: "http://localhost:5551",
   operatorId: "0.0.2",
   operatorKey: "302e...",
   operatorKeyType: "der",
 });
-context.client.setMirrorNetwork(["localhost:5600"]);
 ```
 
-The mirror network is needed for balances and topic subscriptions. See
-[`custom-network.ts`](../../samples/examples/src/network/custom-network.ts).
+- `networkNodes` (`HIERO_NETWORK_NODES="127.0.0.1:50211=0.0.3"`): the
+  consensus nodes.
+- `mirrorNetwork` (`HIERO_MIRROR_NETWORK="localhost:5600"`): the mirror
+  node's gRPC address, needed for balances and topic subscriptions.
+- `mirrorNodeUrl` (`HIERO_MIRROR_NODE_URL="http://localhost:5551"`): the
+  mirror node's REST URL, which balances are read from. Without it the SDK
+  uses port 5551 for a local mirror node, so set it when yours serves REST
+  elsewhere (Solo's default is 38081).
+
+See [`custom-network.ts`](../../samples/examples/src/network/custom-network.ts).
 
 Runnable examples for every service:
 [`samples/examples`](../../samples/examples).
