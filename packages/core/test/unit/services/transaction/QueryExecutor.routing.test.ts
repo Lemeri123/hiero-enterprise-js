@@ -14,8 +14,8 @@ import {
 import type { QueryOptions } from "../../../../src/services/index.js";
 
 // Every service query runs through QueryExecutor: its QueryOptions reach
-// the SDK query, errors carry the method's context, and no transaction
-// listener is notified. Only Query.execute (the network call) is stubbed.
+// the SDK query, listeners receive before/after events, and errors carry
+// the method's context. Only Query.execute (the network call) is stubbed.
 
 const OPTIONS: QueryOptions = { nodeAccountIds: ["0.0.3"] };
 
@@ -218,7 +218,7 @@ describe("query routing through QueryExecutor", () => {
 
     it.each(cases)(
         "%s via %s.%s",
-        async (_query, serviceName, methodName, call) => {
+        async (query, serviceName, methodName, call) => {
             const error = await call(ctx).catch((e: unknown) => e);
 
             expect(error).toBeInstanceOf(HieroError);
@@ -226,8 +226,21 @@ describe("query routing through QueryExecutor", () => {
                 context: `${serviceName}.${methodName}`,
             });
             expect(sent()?.nodeAccountIds?.map(String)).toEqual(["0.0.3"]);
-            expect(listener.onBeforeTransaction).not.toHaveBeenCalled();
-            expect(listener.onAfterTransaction).not.toHaveBeenCalled();
+            expect(listener.onBeforeTransaction).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    type: query,
+                    serviceName,
+                    methodName,
+                }),
+            );
+            expect(listener.onAfterTransaction).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    type: query,
+                    error: expect.objectContaining({
+                        message: "node unavailable",
+                    }),
+                }),
+            );
         },
     );
 });

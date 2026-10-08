@@ -1,8 +1,8 @@
 /**
- * Event emitted before and after each SDK transaction.
+ * Event emitted before and after each SDK transaction or query.
  */
 export interface TransactionEvent {
-    /** Transaction type, e.g. "AccountCreate", "TokenMint" */
+    /** Transaction or query type, e.g. "AccountCreate", "TokenInfoQuery" */
     type: string;
     /** Service class name, e.g. "AccountService" */
     serviceName: string;
@@ -25,9 +25,9 @@ export interface TransactionEvent {
 }
 
 /**
- * Listener interface for transaction lifecycle events.
+ * Listener interface for transaction and query lifecycle events.
  * Register with HieroContext to receive notifications before and after
- * each transaction is executed.
+ * each transaction or query is executed.
  *
  * Listeners observe (logging, metrics, tracing); they cannot change an
  * outcome. A throwing listener is reported as a `HIERO_LISTENER_ERROR`

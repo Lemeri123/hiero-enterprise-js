@@ -33,7 +33,12 @@ export class FileContentsQuery {
     ): Promise<Uint8Array> {
         try {
             const query = new SdkFileContentsQuery().setFileId(fileId);
-            return await this.executor.run(query, options);
+            return await this.executor.run(query, options, {
+                type: "FileContentsQuery",
+                serviceName: "FileService",
+                methodName: "getFileContents",
+                timestamp: new Date(),
+            });
         } catch (error) {
             throw normalizeError(error, "FileService.getFileContents");
         }

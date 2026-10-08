@@ -1,32 +1,64 @@
 import type { Query } from "@hiero-ledger/sdk";
-import { AccountId, Hbar, TransactionId } from "@hiero-ledger/sdk";
+import { AccountId, Hbar, Status, TransactionId } from "@hiero-ledger/sdk";
 import type { IHieroContext } from "../../context/index.js";
+import type { TransactionEvent } from "../../listeners/index.js";
+import { normalizeError } from "../../errors/index.js";
 import type { QueryOptions } from "./QueryOptions.js";
 
 /**
- * Runs SDK consensus-node queries: applies the base options (payer,
- * payment cap, node targeting) and executes the query. Callers normalise
- * errors with their own `Service.method` context.
+ * Owns the full query lifecycle shared across all SDK consensus-node queries:
+ * applying base options (payer, payment cap, node targeting), executing the
+ * query, normalising any error into a `HieroError`, and emitting before/after
+ * lifecycle events.
  *
- * Queries are not transactions, so they are not reported to transaction
- * listeners.
+ * Sibling of `TransactionExecutor` — same observability surface, but for
+ * queries (which don't produce receipts or transaction IDs of their own).
  */
 export class QueryExecutor {
     constructor(private readonly context: IHieroContext) {}
 
     /**
-     * Execute a built query with the given options.
+     * Execute a pre-built query through the full lifecycle.
      *
      * @param query - The built (but not yet executed) query.
      * @param options - Base query options (payer, payment caps, node targeting).
+     * @param event - Event metadata emitted before and after execution.
      * @returns The query result, typed by the query's response type.
      */
     async run<TResult>(
         query: Query<TResult>,
         options: QueryOptions,
+        event: TransactionEvent,
     ): Promise<TResult> {
         this.applyBaseOptions(query, options);
-        return await query.execute(this.context.client);
+
+        await this.context.emitBeforeTransaction(event);
+        const start = Date.now();
+
+        let result: TResult;
+        try {
+            result = await query.execute(this.context.client);
+        } catch (error) {
+            await this.context.emitAfterTransaction({
+                ...event,
+                error:
+                    error instanceof Error ? error : new Error(String(error)),
+                durationMs: Date.now() - start,
+            });
+            throw normalizeError(
+                error,
+                `${event.serviceName}.${event.methodName}`,
+            );
+        }
+
+        // Emit the "after transaction" event now that the query has already succeeded.
+        await this.context.emitAfterTransaction({
+            ...event,
+            status: Status.Success.toString(),
+            durationMs: Date.now() - start,
+        });
+
+        return result;
     }
 
     /**

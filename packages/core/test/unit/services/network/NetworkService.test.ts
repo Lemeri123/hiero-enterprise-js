@@ -148,13 +148,21 @@ describe("NetworkService [facade contract]", () => {
             ).not.toHaveBeenCalled();
         });
 
-        it("does not report the query to transaction listeners", async () => {
+        it("emits lifecycle events with the receipt query type metadata", async () => {
+            const beforeSpy = vi.spyOn(context, "emitBeforeTransaction");
+
             await service.getTransactionReceipt({
                 transactionId: "0.0.123@1700000000.000000000",
             });
 
-            expect(context.emitBeforeTransaction).not.toHaveBeenCalled();
-            expect(context.emitAfterTransaction).not.toHaveBeenCalled();
+            expect(beforeSpy).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    type: "TransactionReceiptQuery",
+                    serviceName: "NetworkService",
+                    methodName: "getTransactionReceipt",
+                    transactionId: "0.0.123@1700000000.000000000",
+                }),
+            );
         });
     });
 
@@ -215,13 +223,19 @@ describe("NetworkService [facade contract]", () => {
             );
         });
 
-        it("does not report the query to transaction listeners", async () => {
+        it("emits lifecycle events with the record query type metadata", async () => {
+            const beforeSpy = vi.spyOn(context, "emitBeforeTransaction");
+
             await service.getTransactionRecord({
                 transactionId: "0.0.123@1700000000.000000000",
             });
 
-            expect(context.emitBeforeTransaction).not.toHaveBeenCalled();
-            expect(context.emitAfterTransaction).not.toHaveBeenCalled();
+            expect(beforeSpy).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    type: "TransactionRecordQuery",
+                    methodName: "getTransactionRecord",
+                }),
+            );
         });
     });
 
@@ -233,11 +247,25 @@ describe("NetworkService [facade contract]", () => {
             expect(result).toBe(mocks.versionInfo);
         });
 
-        it("does not report the query to transaction listeners", async () => {
+        it("emits lifecycle events with the version query type metadata", async () => {
+            const beforeSpy = vi.spyOn(context, "emitBeforeTransaction");
+            const afterSpy = vi.spyOn(context, "emitAfterTransaction");
+
             await service.getNetworkVersionInfo();
 
-            expect(context.emitBeforeTransaction).not.toHaveBeenCalled();
-            expect(context.emitAfterTransaction).not.toHaveBeenCalled();
+            expect(beforeSpy).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    type: "NetworkVersionInfoQuery",
+                    serviceName: "NetworkService",
+                    methodName: "getNetworkVersionInfo",
+                }),
+            );
+            expect(afterSpy).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    type: "NetworkVersionInfoQuery",
+                    status: "SUCCESS",
+                }),
+            );
         });
     });
 });

@@ -10,7 +10,6 @@ import {
     TransactionRecordQuery,
 } from "@hiero-ledger/sdk";
 import type { IHieroContext } from "../../context/index.js";
-import { normalizeError } from "../../errors/index.js";
 import type { QueryOptions } from "../transaction/index.js";
 import { QueryExecutor } from "../transaction/index.js";
 
@@ -104,11 +103,13 @@ export class NetworkService {
             query.setIncludeDuplicates(options.includeDuplicates);
         }
 
-        try {
-            return await this.queryExecutor.run(query, options);
-        } catch (error) {
-            throw normalizeError(error, "NetworkService.getTransactionReceipt");
-        }
+        return await this.queryExecutor.run(query, options, {
+            type: "TransactionReceiptQuery",
+            serviceName: "NetworkService",
+            methodName: "getTransactionReceipt",
+            timestamp: new Date(),
+            transactionId: txId.toString(),
+        });
     }
 
     /**
@@ -143,11 +144,13 @@ export class NetworkService {
             query.setIncludeDuplicates(options.includeDuplicates);
         }
 
-        try {
-            return await this.queryExecutor.run(query, options);
-        } catch (error) {
-            throw normalizeError(error, "NetworkService.getTransactionRecord");
-        }
+        return await this.queryExecutor.run(query, options, {
+            type: "TransactionRecordQuery",
+            serviceName: "NetworkService",
+            methodName: "getTransactionRecord",
+            timestamp: new Date(),
+            transactionId: txId.toString(),
+        });
     }
 
     /**
@@ -163,10 +166,11 @@ export class NetworkService {
     ): Promise<NetworkVersionInfo> {
         const query = new NetworkVersionInfoQuery();
 
-        try {
-            return await this.queryExecutor.run(query, options);
-        } catch (error) {
-            throw normalizeError(error, "NetworkService.getNetworkVersionInfo");
-        }
+        return await this.queryExecutor.run(query, options, {
+            type: "NetworkVersionInfoQuery",
+            serviceName: "NetworkService",
+            methodName: "getNetworkVersionInfo",
+            timestamp: new Date(),
+        });
     }
 }

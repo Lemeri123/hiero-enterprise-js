@@ -2,10 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { AccountId, Hbar, TransactionId } from "@hiero-ledger/sdk";
 import { QueryExecutor } from "../../../../src/services/transaction/index.js";
 import { createMockContext } from "../../../utils/mock-context.js";
+import { HieroError } from "../../../../src/errors/index.js";
 import {
     HieroContext,
     type IHieroContext,
 } from "../../../../src/context/index.js";
+import type { TransactionEvent } from "../../../../src/listeners/index.js";
 
 interface MockQuery {
     setPaymentTransactionId: ReturnType<typeof vi.fn>;
@@ -25,6 +27,13 @@ function buildMockQuery(): MockQuery {
     };
 }
 
+const SAMPLE_EVENT: TransactionEvent = {
+    type: "NetworkVersionInfoQuery",
+    serviceName: "NetworkService",
+    methodName: "getNetworkVersionInfo",
+    timestamp: new Date(0),
+};
+
 describe("QueryExecutor", () => {
     let context: IHieroContext;
     let executor: QueryExecutor;
@@ -39,7 +48,7 @@ describe("QueryExecutor", () => {
 
     describe("applyBaseOptions", () => {
         it("does not call any setters when options are empty", async () => {
-            await executor.run(query as never, {});
+            await executor.run(query as never, {}, SAMPLE_EVENT);
 
             expect(query.setPaymentTransactionId).not.toHaveBeenCalled();
             expect(query.setMaxQueryPayment).not.toHaveBeenCalled();
@@ -48,7 +57,11 @@ describe("QueryExecutor", () => {
         });
 
         it("sets a payment transaction ID generated from a string payer", async () => {
-            await executor.run(query as never, { payerAccountId: "0.0.500" });
+            await executor.run(
+                query as never,
+                { payerAccountId: "0.0.500" },
+                SAMPLE_EVENT,
+            );
 
             expect(query.setPaymentTransactionId).toHaveBeenCalledTimes(1);
             const txId = query.setPaymentTransactionId.mock
@@ -60,7 +73,11 @@ describe("QueryExecutor", () => {
         it("sets a payment transaction ID generated from an AccountId payer", async () => {
             const payer = AccountId.fromString("0.0.501");
 
-            await executor.run(query as never, { payerAccountId: payer });
+            await executor.run(
+                query as never,
+                { payerAccountId: payer },
+                SAMPLE_EVENT,
+            );
 
             const txId = query.setPaymentTransactionId.mock
                 .calls[0][0] as TransactionId;
@@ -68,7 +85,11 @@ describe("QueryExecutor", () => {
         });
 
         it("coerces a numeric maxQueryPayment into an Hbar", async () => {
-            await executor.run(query as never, { maxQueryPayment: 2 });
+            await executor.run(
+                query as never,
+                { maxQueryPayment: 2 },
+                SAMPLE_EVENT,
+            );
 
             const arg = query.setMaxQueryPayment.mock.calls[0][0] as Hbar;
             expect(arg).toBeInstanceOf(Hbar);
@@ -78,13 +99,21 @@ describe("QueryExecutor", () => {
         it("passes an Hbar maxQueryPayment through unchanged", async () => {
             const fee = new Hbar(5);
 
-            await executor.run(query as never, { maxQueryPayment: fee });
+            await executor.run(
+                query as never,
+                { maxQueryPayment: fee },
+                SAMPLE_EVENT,
+            );
 
             expect(query.setMaxQueryPayment).toHaveBeenCalledWith(fee);
         });
 
         it("coerces a numeric queryPayment into an Hbar", async () => {
-            await executor.run(query as never, { queryPayment: 1 });
+            await executor.run(
+                query as never,
+                { queryPayment: 1 },
+                SAMPLE_EVENT,
+            );
 
             const arg = query.setQueryPayment.mock.calls[0][0] as Hbar;
             expect(arg).toBeInstanceOf(Hbar);
@@ -92,9 +121,11 @@ describe("QueryExecutor", () => {
         });
 
         it("converts each string node ID into an AccountId", async () => {
-            await executor.run(query as never, {
-                nodeAccountIds: ["0.0.3", "0.0.4"],
-            });
+            await executor.run(
+                query as never,
+                { nodeAccountIds: ["0.0.3", "0.0.4"] },
+                SAMPLE_EVENT,
+            );
 
             expect(query.setNodeAccountIds).toHaveBeenCalledTimes(1);
             const ids = query.setNodeAccountIds.mock.calls[0][0] as AccountId[];
@@ -105,37 +136,125 @@ describe("QueryExecutor", () => {
         });
 
         it("ignores an empty nodeAccountIds array", async () => {
-            await executor.run(query as never, { nodeAccountIds: [] });
+            await executor.run(
+                query as never,
+                { nodeAccountIds: [] },
+                SAMPLE_EVENT,
+            );
 
             expect(query.setNodeAccountIds).not.toHaveBeenCalled();
         });
     });
 
-    describe("execution", () => {
+    describe("lifecycle", () => {
+        it("emits before, executes, then emits after with success status", async () => {
+            const calls: string[] = [];
+            (
+                context.emitBeforeTransaction as ReturnType<typeof vi.fn>
+            ).mockImplementation(() => {
+                calls.push("before");
+                return Promise.resolve();
+            });
+            query.execute.mockImplementation(() => {
+                calls.push("execute");
+                return Promise.resolve("query-result");
+            });
+            (
+                context.emitAfterTransaction as ReturnType<typeof vi.fn>
+            ).mockImplementation(() => {
+                calls.push("after");
+                return Promise.resolve();
+            });
+
+            const result = await executor.run(query as never, {}, SAMPLE_EVENT);
+
+            expect(calls).toEqual(["before", "execute", "after"]);
+            expect(result).toBe("query-result");
+        });
+
+        it("forwards the event metadata to before emit unchanged", async () => {
+            await executor.run(query as never, {}, SAMPLE_EVENT);
+
+            expect(context.emitBeforeTransaction).toHaveBeenCalledWith(
+                SAMPLE_EVENT,
+            );
+        });
+
+        it("enriches the after event with SUCCESS status and duration", async () => {
+            await executor.run(query as never, {}, SAMPLE_EVENT);
+
+            expect(context.emitAfterTransaction).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    type: SAMPLE_EVENT.type,
+                    serviceName: SAMPLE_EVENT.serviceName,
+                    methodName: SAMPLE_EVENT.methodName,
+                    status: "SUCCESS",
+                    durationMs: expect.any(Number),
+                }),
+            );
+        });
+
         it("returns the query's resolved value", async () => {
             query.execute.mockResolvedValueOnce({ custom: "payload" });
 
-            const result = await executor.run(query as never, {});
+            const result = await executor.run(query as never, {}, SAMPLE_EVENT);
 
             expect(result).toEqual({ custom: "payload" });
         });
+    });
 
-        it("propagates the query's error unchanged", async () => {
+    describe("error handling", () => {
+        it("normalises a thrown error into HieroError with the service.method context", async () => {
             const original = new Error("query failed");
             query.execute.mockRejectedValueOnce(original);
 
-            await expect(executor.run(query as never, {})).rejects.toBe(
-                original,
+            await expect(
+                executor.run(query as never, {}, SAMPLE_EVENT),
+            ).rejects.toBeInstanceOf(HieroError);
+
+            query.execute.mockRejectedValueOnce(original);
+            await expect(
+                executor.run(query as never, {}, SAMPLE_EVENT),
+            ).rejects.toMatchObject({
+                context: "NetworkService.getNetworkVersionInfo",
+                cause: original,
+            });
+        });
+
+        it("emits an after event carrying the original error before throwing", async () => {
+            const original = new Error("boom");
+            query.execute.mockRejectedValueOnce(original);
+
+            await expect(
+                executor.run(query as never, {}, SAMPLE_EVENT),
+            ).rejects.toThrow();
+
+            expect(context.emitAfterTransaction).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    error: original,
+                    durationMs: expect.any(Number),
+                }),
             );
+        });
+
+        it("wraps a non-Error rejection into an Error for the after event", async () => {
+            query.execute.mockRejectedValueOnce("string failure");
+
+            await expect(
+                executor.run(query as never, {}, SAMPLE_EVENT),
+            ).rejects.toThrow();
+
+            const afterCall = (
+                context.emitAfterTransaction as ReturnType<typeof vi.fn>
+            ).mock.calls[0][0];
+            expect(afterCall.error).toBeInstanceOf(Error);
+            expect((afterCall.error as Error).message).toBe("string failure");
         });
     });
 
-    describe("transaction listeners", () => {
+    describe("run() — listener failures", () => {
         let ctx: HieroContext;
-        const listener = {
-            onBeforeTransaction: vi.fn(),
-            onAfterTransaction: vi.fn(),
-        };
+        let emitWarning: ReturnType<typeof vi.spyOn>;
 
         beforeEach(() => {
             ctx = new HieroContext({
@@ -145,29 +264,62 @@ describe("QueryExecutor", () => {
                 operatorKey:
                     "302e020100300506032b6570042204203b054ddd0c62d577ce0fbb0e92dcce0d5bea42a98a5c9663271939881ce19208",
             });
-            ctx.addTransactionListener(listener);
+            ctx.addTransactionListener({
+                onAfterTransaction: () => {
+                    throw new Error("listener bug");
+                },
+            });
+            emitWarning = vi
+                .spyOn(process, "emitWarning")
+                .mockImplementation(() => undefined);
         });
 
         afterEach(() => {
+            emitWarning.mockRestore();
             ctx.close();
         });
 
-        it("are not notified of a successful query", async () => {
-            await new QueryExecutor(ctx).run(query as never, {});
+        it("emits the after-event once when emitting the success event fails", async () => {
+            vi.mocked(context.emitAfterTransaction).mockRejectedValueOnce(
+                new Error("listener bug"),
+            );
 
-            expect(listener.onBeforeTransaction).not.toHaveBeenCalled();
-            expect(listener.onAfterTransaction).not.toHaveBeenCalled();
-        });
-
-        it("are not notified of a failed query", async () => {
-            query.execute.mockRejectedValueOnce(new Error("query failed"));
-
-            await new QueryExecutor(ctx)
-                .run(query as never, {})
+            await executor
+                .run(query as never, {}, SAMPLE_EVENT)
                 .catch(() => undefined);
 
-            expect(listener.onBeforeTransaction).not.toHaveBeenCalled();
-            expect(listener.onAfterTransaction).not.toHaveBeenCalled();
+            expect(context.emitAfterTransaction).toHaveBeenCalledTimes(1);
+        });
+
+        it("returns the result when an onAfterTransaction listener throws", async () => {
+            await expect(
+                new QueryExecutor(ctx).run(query as never, {}, SAMPLE_EVENT),
+            ).resolves.toBe("query-result");
+        });
+
+        it("still runs when an onBeforeTransaction listener throws", async () => {
+            ctx.addTransactionListener({
+                onBeforeTransaction: () => {
+                    throw new Error("metrics backend down");
+                },
+            });
+
+            const result = await new QueryExecutor(ctx).run(
+                query as never,
+                {},
+                SAMPLE_EVENT,
+            );
+
+            expect(result).toBe("query-result");
+        });
+
+        it("keeps the original error when an onAfterTransaction listener throws", async () => {
+            const original = new Error("query exploded");
+            query.execute.mockRejectedValueOnce(original);
+
+            await expect(
+                new QueryExecutor(ctx).run(query as never, {}, SAMPLE_EVENT),
+            ).rejects.toMatchObject({ cause: original });
         });
     });
 });

@@ -25,7 +25,12 @@ export class ContractInfoQuery {
     ): Promise<ContractInfo> {
         try {
             const query = new SdkContractInfoQuery().setContractId(contractId);
-            return await this.executor.run(query, options);
+            return await this.executor.run(query, options, {
+                type: "ContractInfoQuery",
+                serviceName: "ContractService",
+                methodName: "getContractInfo",
+                timestamp: new Date(),
+            });
         } catch (error) {
             throw normalizeError(error, "ContractService.getContractInfo");
         }

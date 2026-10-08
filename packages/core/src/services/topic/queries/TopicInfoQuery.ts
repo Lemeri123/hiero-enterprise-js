@@ -79,7 +79,12 @@ export class TopicInfoQuery {
     ): Promise<TopicInfoResult> {
         try {
             const query = new SdkTopicInfoQuery().setTopicId(topicId);
-            const info = await this.executor.run(query, options);
+            const info = await this.executor.run(query, options, {
+                type: "TopicInfoQuery",
+                serviceName: "TopicService",
+                methodName: "getTopicInfo",
+                timestamp: new Date(),
+            });
             return {
                 topicId: info.topicId.toString(),
                 topicMemo: info.topicMemo,

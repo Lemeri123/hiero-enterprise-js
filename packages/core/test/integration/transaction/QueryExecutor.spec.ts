@@ -11,6 +11,7 @@ import {
 } from "../../utils/integration-fixtures.js";
 import { QueryExecutor } from "../../../src/services/transaction/index.js";
 import { AccountService } from "../../../src/services/index.js";
+import { HieroError } from "../../../src/errors/index.js";
 import type { HieroContext } from "../../../src/context/index.js";
 
 describe("QueryExecutor [Integration]", () => {
@@ -33,6 +34,12 @@ describe("QueryExecutor [Integration]", () => {
             const result = await executor.run(
                 new NetworkVersionInfoQuery(),
                 {},
+                {
+                    type: "NetworkVersionInfoQuery",
+                    serviceName: "IntegrationTest",
+                    methodName: "getNetworkVersionInfo",
+                    timestamp: new Date(),
+                },
             );
 
             expect(result.servicesVersion).toBeDefined();
@@ -40,7 +47,7 @@ describe("QueryExecutor [Integration]", () => {
             expect(result.protobufVersion).toBeDefined();
         });
 
-        it("does not report the query to transaction listeners", async () => {
+        it("emits before and after lifecycle events with SUCCESS status", async () => {
             const before = vi.fn();
             const after = vi.fn();
             context.addTransactionListener({
@@ -48,10 +55,31 @@ describe("QueryExecutor [Integration]", () => {
                 onAfterTransaction: after,
             });
 
-            await executor.run(new NetworkVersionInfoQuery(), {});
+            await executor.run(
+                new NetworkVersionInfoQuery(),
+                {},
+                {
+                    type: "NetworkVersionInfoQuery",
+                    serviceName: "IntegrationTest",
+                    methodName: "getNetworkVersionInfo",
+                    timestamp: new Date(),
+                },
+            );
 
-            expect(before).not.toHaveBeenCalled();
-            expect(after).not.toHaveBeenCalled();
+            expect(before).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    type: "NetworkVersionInfoQuery",
+                    serviceName: "IntegrationTest",
+                    methodName: "getNetworkVersionInfo",
+                }),
+            );
+            expect(after).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    type: "NetworkVersionInfoQuery",
+                    status: "SUCCESS",
+                    durationMs: expect.any(Number),
+                }),
+            );
         });
     });
 
@@ -62,6 +90,12 @@ describe("QueryExecutor [Integration]", () => {
             const info = await executor.run(
                 new AccountInfoQuery().setAccountId(operatorId),
                 {},
+                {
+                    type: "AccountInfoQuery",
+                    serviceName: "IntegrationTest",
+                    methodName: "getAccountInfo",
+                    timestamp: new Date(),
+                },
             );
 
             expect(info.accountId.toString()).toBe(operatorId);
@@ -73,6 +107,12 @@ describe("QueryExecutor [Integration]", () => {
                     context.operatorAccountId!.toString(),
                 ),
                 { maxQueryPayment: 2 },
+                {
+                    type: "AccountInfoQuery",
+                    serviceName: "IntegrationTest",
+                    methodName: "getAccountInfo",
+                    timestamp: new Date(),
+                },
             );
 
             expect(info.accountId).toBeDefined();
@@ -84,6 +124,12 @@ describe("QueryExecutor [Integration]", () => {
                     context.operatorAccountId!.toString(),
                 ),
                 { queryPayment: new Hbar(1) },
+                {
+                    type: "AccountInfoQuery",
+                    serviceName: "IntegrationTest",
+                    methodName: "getAccountInfo",
+                    timestamp: new Date(),
+                },
             );
 
             expect(info.accountId).toBeDefined();
@@ -93,6 +139,12 @@ describe("QueryExecutor [Integration]", () => {
             const info = await executor.run(
                 new AccountInfoQuery().setAccountId(funded.accountId),
                 { payerAccountId: funded.accountId },
+                {
+                    type: "AccountInfoQuery",
+                    serviceName: "IntegrationTest",
+                    methodName: "getAccountInfo",
+                    timestamp: new Date(),
+                },
             );
 
             expect(info.accountId.toString()).toBe(funded.accountId);
@@ -100,7 +152,7 @@ describe("QueryExecutor [Integration]", () => {
     });
 
     describe("run() — error handling", () => {
-        it("rejects a failed query without notifying transaction listeners", async () => {
+        it("normalises a failed query into HieroError and emits the error in the after event", async () => {
             const after = vi.fn();
             context.addTransactionListener({ onAfterTransaction: after });
 
@@ -111,9 +163,26 @@ describe("QueryExecutor [Integration]", () => {
             // timeout).
             const query = new AccountInfoQuery().setAccountId("0.0.99999999");
 
-            await expect(executor.run(query, {})).rejects.toThrow();
+            await expect(
+                executor.run(
+                    query,
+                    {},
+                    {
+                        type: "AccountInfoQuery",
+                        serviceName: "IntegrationTest",
+                        methodName: "getAccountInfo",
+                        timestamp: new Date(),
+                    },
+                ),
+            ).rejects.toBeInstanceOf(HieroError);
 
-            expect(after).not.toHaveBeenCalled();
+            expect(after).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    type: "AccountInfoQuery",
+                    error: expect.any(Error),
+                    durationMs: expect.any(Number),
+                }),
+            );
         });
     });
 });

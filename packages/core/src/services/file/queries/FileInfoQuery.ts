@@ -70,7 +70,12 @@ export class FileInfoQuery {
     ): Promise<FileInfoResult> {
         try {
             const query = new SdkFileInfoQuery().setFileId(fileId);
-            const info = await this.executor.run(query, options);
+            const info = await this.executor.run(query, options, {
+                type: "FileInfoQuery",
+                serviceName: "FileService",
+                methodName: "getFileInfo",
+                timestamp: new Date(),
+            });
             return {
                 fileId: info.fileId.toString(),
                 size: info.size.toNumber(),

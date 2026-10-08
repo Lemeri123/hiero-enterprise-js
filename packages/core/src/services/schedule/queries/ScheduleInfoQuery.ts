@@ -69,7 +69,12 @@ export class ScheduleInfoQuery {
     ): Promise<ScheduleInfoResult> {
         try {
             const query = new SdkScheduleInfoQuery().setScheduleId(scheduleId);
-            const info = await this.executor.run(query, options);
+            const info = await this.executor.run(query, options, {
+                type: "ScheduleInfoQuery",
+                serviceName: "ScheduleService",
+                methodName: "getInfo",
+                timestamp: new Date(),
+            });
             const isExecuted = info.executed !== null;
             const isDeleted = info.deleted !== null;
 

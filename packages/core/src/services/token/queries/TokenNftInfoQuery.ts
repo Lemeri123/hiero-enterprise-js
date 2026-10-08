@@ -70,7 +70,12 @@ export class TokenNftInfoQuery {
     ): Promise<TokenNftInfoResult> {
         try {
             const query = new SdkTokenNftInfoQuery().setNftId(nftId);
-            const infos = await this.executor.run(query, options);
+            const infos = await this.executor.run(query, options, {
+                type: "TokenNftInfoQuery",
+                serviceName: "TokenService",
+                methodName: "getNftInfo",
+                timestamp: new Date(),
+            });
             const info = infos[0];
             if (info == null) {
                 throw new HieroError(

@@ -93,7 +93,12 @@ export class ContractCallQuery {
                 query.setMaxResultSize(options.maxResultSize);
             }
 
-            return await this.executor.run(query, options);
+            return await this.executor.run(query, options, {
+                type: "ContractCallQuery",
+                serviceName: "ContractService",
+                methodName: "callContract",
+                timestamp: new Date(),
+            });
         } catch (error) {
             throw normalizeError(error, "ContractService.callContract");
         }
