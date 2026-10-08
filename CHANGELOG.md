@@ -51,6 +51,7 @@ All published packages (`@hiero-hackers/enterprise-core`, `-mirror`, `-express`,
 ### Fixed
 
 - Fixed `HieroContext` leaking an SDK client when the operator credentials are invalid; credentials are now parsed before the client is created, and a malformed `operatorId` throws a `HieroError` with `CONFIG_INVALID` instead of a raw SDK error. [#271](https://github.com/hiero-hackers/hiero-enterprise-js/pull/271) [#246](https://github.com/hiero-hackers/hiero-enterprise-js/issues/246)
+- Fixed `HieroConfig.grpcDeadlineMs` being ignored; `HieroContext` now applies it alongside `requestTimeoutMs`, in an order that keeps a valid pair from triggering the SDK's deadline/timeout warning. [#272](https://github.com/hiero-hackers/hiero-enterprise-js/pull/272) [#247](https://github.com/hiero-hackers/hiero-enterprise-js/issues/247)
 
 ### Security
 
