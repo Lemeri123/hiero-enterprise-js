@@ -63,8 +63,9 @@ pnpm format
 ```
 
 Once building and testing pass, see the [samples](samples/README.md) for
-runnable examples of each package (Express/Fastify/NestJS integrations,
-plus a mirror-node example gallery that needs no credentials).
+runnable examples of each package (Express/Fastify/NestJS apps using
+core + mirror directly, plus a mirror-node example gallery that needs no
+credentials).
 
 ## Installing the published packages
 

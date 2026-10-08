@@ -33,9 +33,8 @@ function parsePrivateKey(key: string, keyType: string): PrivateKey {
  * Central context for interacting with a Hiero network.
  * Manages the SDK Client lifecycle and provides access to the operator account.
  *
- * This is NOT a singleton — create one instance per application lifecycle.
- * Framework integrations (Express middleware, Fastify plugin, NestJS module)
- * manage the instance scope.
+ * This is NOT a singleton — create one instance per application lifecycle,
+ * share it across requests, and call `close()` on shutdown.
  *
  * @example
  * ```ts
