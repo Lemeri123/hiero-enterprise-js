@@ -12,10 +12,11 @@
         "test:unit": "pnpm -r run test:unit",
         "test:integration": "pnpm -r run test:integration",
         "test:watch": "pnpm -r run test:watch",
-        "lint": "eslint . --fix",
+        "lint": "eslint .",
+        "lint:fix": "eslint . --fix",
         "format": "prettier --write .",
-        "example": "pnpm --filter @hiero-hackers/examples examples",
-        "conventions": "node scripts/check-conventions.mjs"
+        "format:check": "prettier --check .",
+        "example": "pnpm --filter @hiero-hackers/examples examples"
     },
     "devDependencies": {
         "@arethetypeswrong/cli": "0.18.5",

@@ -250,13 +250,11 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for how to report bugs, request feature
 
 ## Releasing
 
-Publishing is done by [`.github/workflows/release.yml`](./.github/workflows/release.yml) — it runs when a `v*.*.*` tag is pushed and publishes every public `@hiero-hackers/*` package to npm with provenance. Developers never publish from their machines; the npm token lives only as the org-owned `TOKEN_ENTERPRISE_JS` repository secret.
+Publishing is done by [`.github/workflows/release.yml`](./.github/workflows/release.yml) — it runs when a `v*.*.*` tag is pushed and publishes every public `@hiero-hackers/*` package to the [GitHub Packages npm registry](https://github.com/orgs/hiero-hackers/packages?repo_name=hiero-enterprise-js), then cuts a GitHub Release for the tag. Developers never publish from their machines, and there is no publish token to manage: the workflow authenticates with its own `GITHUB_TOKEN` (`packages: write`). Consumers need a token with `read:packages`; see [Installing the published packages](./CONTRIBUTING.md#installing-the-published-packages).
 
 A release ships **whatever is on `main` at the tagged commit** — it is not tied to any one feature branch. Merge everything you want included first, then cut the release as its own step.
 
 All five packages are versioned **in lockstep**: one version number, one tag. The workflow refuses to publish if the tag, the root `package.json`, and every `packages/*` version don't all agree.
-
-**Prerequisite (one-time):** an npm automation token with publish rights to the `@hiero-hackers` scope, stored as the `TOKEN_ENTERPRISE_JS` repository secret.
 
 **To cut a release:**
 
@@ -284,7 +282,7 @@ All five packages are versioned **in lockstep**: one version number, one tag. Th
 
 - The tag must equal the workspace version (`v0.3.0` ↔ `0.3.0`), or the workflow fails before publishing — this is a guard, not a suggestion.
 - `pnpm -r publish` skips the `private` root and samples, rewrites each `workspace:*` dependency to the version being published, and publishes in dependency order (`core`/`mirror` before the `express`/`fastify`/`nest` adapters).
-- Re-pushing a tag for a version that's already on npm fails cleanly — there is no accidental double-publish. To fix a botched release, bump to the next patch and tag again; published versions are immutable.
+- Re-pushing a tag for a version that's already on the registry fails cleanly — there is no accidental double-publish. To fix a botched release, bump to the next patch and tag again; published versions are immutable.
 - `workflow_dispatch` can run the workflow manually (e.g. to re-attempt a failed publish); it skips the tag/version guards, so use it deliberately.
 
 ## License

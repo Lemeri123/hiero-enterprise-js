@@ -52,14 +52,14 @@ pnpm install
 # Build all packages
 pnpm build
 
-# Run unit tests
-pnpm test
+# Run unit tests (no network needed)
+pnpm test:unit
 
-# Lint (type check + ESLint)
+# Lint (ESLint with type-aware rules); `pnpm lint:fix` auto-fixes
 pnpm lint
 
-# Format code
-pnpm format
+# Check formatting (CI runs this); `pnpm format` rewrites files
+pnpm format:check
 ```
 
 Once building and testing pass, see the [samples](samples/README.md) for
@@ -101,7 +101,7 @@ for the tag, so the Releases tab always mirrors what is on the registry.
 
 | What it proves                             | Command                                                                                                                             | Network needed                              |
 | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| All packages' unit tests                   | `pnpm test`                                                                                                                         | none                                        |
+| All packages' unit tests                   | `pnpm test:unit`                                                                                                                    | none                                        |
 | Mirror unit tests + spec-coverage tripwire | `pnpm --filter @hiero-hackers/enterprise-mirror test`                                                                                       | none                                        |
 | Mirror unit tests with coverage gates      | `pnpm --filter @hiero-hackers/enterprise-mirror run test:unit:coverage`                                                                     | none                                        |
 | Core SDK end-to-end                        | `pnpm --filter @hiero-hackers/enterprise-core run test:integration`                                                                         | local Solo                                  |
@@ -207,9 +207,9 @@ Adding an endpoint touches one spot in each layer, in this order:
    tool parses it).
 2. **Public type** in the matching `src/types/*.ts` — the camelCase shape
    consumers see. Export both from [`src/types/index.ts`](packages/mirror/src/types/index.ts).
-3. **Converter** in [`src/mirror-node-converters.ts`](packages/mirror/src/mirror-node-converters.ts)
+3. **Converter** in [`src/utils/MirrorNodeConverters.ts`](packages/mirror/src/utils/MirrorNodeConverters.ts)
    mapping raw → public. Single-object endpoints also get a **validator**
-   in [`src/mirror-node-validators.ts`](packages/mirror/src/mirror-node-validators.ts).
+   in [`src/utils/MirrorNodeValidators.ts`](packages/mirror/src/utils/MirrorNodeValidators.ts).
 4. **Query type** in [`src/types/query.ts`](packages/mirror/src/types/query.ts)
    for any filters (reuse `RangeFilter` / `EntityIdFilter` / `TimestampFilter`).
 5. **Client method** in the matching `// ───` section of
@@ -235,8 +235,7 @@ runbook for the vendored spec itself lives in
 
 ## Naming & Structure Conventions
 
-Machine-checked by `node scripts/check-conventions.mjs` (runs in CI) —
-if it passes, you follow the conventions.
+These are not machine-checked; reviewers look for them in pull requests.
 
 | Thing | Convention | Example |
 | --- | --- | --- |
@@ -313,7 +312,7 @@ Code contributions are handled using [Pull Requests][pull-requests]. Please keep
 
 - **TypeScript** — strict mode, no implicit `any`
 - **ESLint** — `typescript-eslint` recommended rules with Prettier integration
-- **Prettier** — enforced formatting (single quotes, trailing commas, 80-char width)
+- **Prettier** — enforced formatting (double quotes, 4-space indent, trailing commas, 80-char width), checked in CI by `pnpm format:check`
 - **Naming** — `PascalCase` for classes/interfaces, `camelCase` for functions/variables
 - **Imports** — use `import type` for type-only imports
 - **Tests** — use [Vitest](https://vitest.dev/); aim for coverage of all public API methods
@@ -373,7 +372,7 @@ Before submitting your pull request, refer to the pull request readiness checkli
 - [ ] Local run of `pnpm run build` succeeds
 - [ ] Linting passes: `pnpm run lint`
 - [ ] Formatting passes: `pnpm run format:check`
-- [ ] Unit tests pass: `pnpm run test`
+- [ ] Unit tests pass: `pnpm run test:unit`
 - [ ] Git commit message is detailed and includes context behind the change
 - [ ] Commits are signed off (`git commit -s`) and GPG-signed
 - [ ] If the change is related to an existing Bug Report or Feature Request, please include its issue number
