@@ -1,7 +1,7 @@
 {
     "name": "@hiero-hackers/enterprise-express",
     "version": "0.3.0",
-    "description": "Express middleware for the Hiero network",
+    "description": "Deprecated: use @hiero-hackers/enterprise-core and @hiero-hackers/enterprise-mirror directly. Express middleware for the Hiero network",
     "license": "Apache-2.0",
     "type": "module",
     "main": "./dist/index.cjs",

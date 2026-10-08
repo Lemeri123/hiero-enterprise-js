@@ -1,13 +1,27 @@
 import "dotenv/config";
 import Fastify from "fastify";
-import { hieroPlugin } from "@hiero-hackers/enterprise-fastify";
+import { createHiero, toHttpError } from "./hiero.js";
+
+// ─── Hiero Integration ────────────────────────────────────────
+// Create the services once and share them across all routes.
+// Config is read from env vars (see .env.example).
+const hiero = createHiero();
 
 const app = Fastify({ logger: true });
 
-// ─── Hiero Integration ────────────────────────────────────────
-// Register the plugin — all services are available at app.hiero.
-// Config is read from env vars (HIERO_NETWORK, HIERO_OPERATOR_ID, HIERO_OPERATOR_KEY).
-await app.register(hieroPlugin);
+// Release the SDK client when the server shuts down.
+app.addHook("onClose", () => {
+    hiero.close();
+});
+
+// Map Hiero errors to HTTP statuses; anything else keeps Fastify's
+// default handling.
+app.setErrorHandler((error, _request, reply) => {
+    const mapped = toHttpError(error);
+    if (!mapped) return reply.send(error);
+    if (mapped.status >= 500) app.log.error(error);
+    return reply.code(mapped.status).send(mapped.body);
+});
 
 // ─── Root Route ───────────────────────────────────────────────
 
@@ -40,19 +54,19 @@ app.get("/", () => {
 
 /** Get the operator account balance */
 app.get("/api/balance", async () => {
-    return await app.hiero.accountService.getOperatorAccountBalance();
+    return await hiero.accountService.getOperatorAccountBalance();
 });
 
 /** Query an account from the mirror node */
 app.get<{ Params: { id: string } }>("/api/accounts/:id", async (request) => {
-    return await app.hiero.accountRepository.findByAccountId(request.params.id);
+    return await hiero.accountRepository.findByAccountId(request.params.id);
 });
 
 /** Query NFTs owned by an account */
 app.get<{ Params: { id: string } }>(
     "/api/accounts/:id/nfts",
     async (request) => {
-        return await app.hiero.nftRepository.findByOwner(request.params.id);
+        return await hiero.nftRepository.findByOwner(request.params.id);
     },
 );
 
@@ -60,7 +74,7 @@ app.get<{ Params: { id: string } }>(
 
 /** Query a token by ID */
 app.get<{ Params: { id: string } }>("/api/tokens/:id", async (request) => {
-    return await app.hiero.tokenRepository.findById(request.params.id);
+    return await hiero.tokenRepository.findById(request.params.id);
 });
 
 // ─── Topic Routes ─────────────────────────────────────────────
@@ -69,13 +83,13 @@ app.get<{ Params: { id: string } }>("/api/tokens/:id", async (request) => {
 app.get<{ Params: { id: string } }>(
     "/api/topics/:id/messages",
     async (request) => {
-        return await app.hiero.topicRepository.findByTopicId(request.params.id);
+        return await hiero.topicRepository.findByTopicId(request.params.id);
     },
 );
 
 /** Create a new public topic */
 app.post<{ Body: { memo?: string } }>("/api/topics", async (request, reply) => {
-    const topicId = await app.hiero.topicService.createTopic({
+    const topicId = await hiero.topicService.createTopic({
         topicMemo: request.body.memo,
     });
     reply.code(201);
@@ -86,7 +100,7 @@ app.post<{ Body: { memo?: string } }>("/api/topics", async (request, reply) => {
 app.post<{ Params: { id: string }; Body: { message: string } }>(
     "/api/topics/:id/messages",
     async (request, reply) => {
-        const result = await app.hiero.topicService.submitMessage({
+        const result = await hiero.topicService.submitMessage({
             topicId: request.params.id,
             message: request.body.message,
         });
@@ -103,12 +117,12 @@ app.post<{ Params: { id: string }; Body: { message: string } }>(
 
 /** Query exchange rates */
 app.get("/api/network/exchange-rates", async () => {
-    return await app.hiero.networkRepository.findExchangeRates();
+    return await hiero.networkRepository.findExchangeRates();
 });
 
 /** Query network supply */
 app.get("/api/network/supply", async () => {
-    return await app.hiero.networkRepository.findNetworkSupplies();
+    return await hiero.networkRepository.findNetworkSupplies();
 });
 
 // ─── Start ────────────────────────────────────────────────────
@@ -137,4 +151,12 @@ try {
 } catch (err) {
     app.log.error(err);
     process.exit(1);
+}
+
+// ─── Shutdown ─────────────────────────────────────────────────
+
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    process.once(signal, () => {
+        void app.close().then(() => process.exit(0));
+    });
 }

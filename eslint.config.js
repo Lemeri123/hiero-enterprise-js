@@ -48,6 +48,14 @@ export default defineConfig(
             "@typescript-eslint/require-await": "error",
         },
     },
+    // The framework adapters are deprecated as a whole (#238); their own
+    // code naturally uses their own deprecated exports.
+    {
+        files: ["packages/{express,fastify,nest}/**/*.ts"],
+        rules: {
+            "@typescript-eslint/no-deprecated": "off",
+        },
+    },
     {
         files: ["**/*.{js,ts}"],
         rules: {

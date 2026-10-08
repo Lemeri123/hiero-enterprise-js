@@ -19,6 +19,11 @@ declare module "fastify" {
 /**
  * Plugin options — accepts a combined core + mirror config or reads from
  * environment.
+ *
+ * @deprecated `@hiero-hackers/enterprise-fastify` is deprecated and will be
+ * removed in a future release. Use `@hiero-hackers/enterprise-core` and
+ * `@hiero-hackers/enterprise-mirror` directly — see the migration guide
+ * in the repository README.
  */
 export interface HieroPluginOptions extends FastifyPluginOptions {
     config?: HieroAdapterConfig;
@@ -43,6 +48,11 @@ export interface HieroPluginOptions extends FastifyPluginOptions {
  *   return balance;
  * });
  * ```
+ *
+ * @deprecated `@hiero-hackers/enterprise-fastify` is deprecated and will be
+ * removed in a future release. Use `@hiero-hackers/enterprise-core` and
+ * `@hiero-hackers/enterprise-mirror` directly — see the migration guide
+ * in the repository README.
  */
 const plugin = function (fastify: FastifyInstance, opts: HieroPluginOptions) {
     if (!opts.config) {
@@ -59,6 +69,15 @@ const plugin = function (fastify: FastifyInstance, opts: HieroPluginOptions) {
     });
 };
 
+/**
+ * Fastify plugin that decorates the instance with Hiero services at
+ * `fastify.hiero`.
+ *
+ * @deprecated `@hiero-hackers/enterprise-fastify` is deprecated and will be
+ * removed in a future release. Use `@hiero-hackers/enterprise-core` and
+ * `@hiero-hackers/enterprise-mirror` directly — see the migration guide
+ * in the repository README.
+ */
 export const hieroPlugin = fp(plugin, {
     name: "@hiero-hackers/enterprise-fastify",
 });

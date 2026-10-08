@@ -36,6 +36,11 @@ declare global {
  *   res.json(balance);
  * });
  * ```
+ *
+ * @deprecated `@hiero-hackers/enterprise-express` is deprecated and will be
+ * removed in a future release. Use `@hiero-hackers/enterprise-core` and
+ * `@hiero-hackers/enterprise-mirror` directly — see the migration guide
+ * in the repository README.
  */
 export function hieroMiddleware(config?: HieroAdapterConfig) {
     if (!config) {

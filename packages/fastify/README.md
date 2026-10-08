@@ -1,5 +1,15 @@
 # @hiero-hackers/enterprise-fastify
 
+> [!WARNING]
+> **Deprecated.** This package will be removed in a future release and
+> logs a one-time `DeprecationWarning` (code
+> `HIERO_ENTERPRISE_FASTIFY_DEPRECATED`) when it is first used.
+> Use [`@hiero-hackers/enterprise-core`](../core) and
+> [`@hiero-hackers/enterprise-mirror`](../mirror) directly instead: see
+> [Migrating from the framework adapters](../../README.md#migrating-from-the-framework-adapters)
+> and the [Fastify sample](../../samples/fastify-sample), which shows the
+> replacement in a few lines.
+
 Fastify plugin for Hiero. **This is the only package you install** — it
 composes `@hiero-hackers/enterprise-core` (write-side SDK services) and
 `@hiero-hackers/enterprise-mirror` (read-side REST repositories) and decorates

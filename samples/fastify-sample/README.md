@@ -1,6 +1,6 @@
 # Fastify Sample
 
-A REST API built with [Fastify](https://fastify.dev/) and `@hiero-hackers/enterprise-fastify` demonstrating how to query accounts, tokens, NFTs, topics, and network data from a Hiero network.
+A REST API built with [Fastify](https://fastify.dev/), `@hiero-hackers/enterprise-core` and `@hiero-hackers/enterprise-mirror` demonstrating how to query accounts, tokens, NFTs, topics, and network data from a Hiero network.
 
 ## Setup
 
@@ -43,18 +43,21 @@ pnpm --filter hiero-fastify-sample start
 
 ## How It Works
 
-Register the Hiero plugin with your Fastify instance:
+[`src/hiero.ts`](./src/hiero.ts) creates the Hiero services once at startup; the app shares them across routes and closes them with the server:
 
 ```ts
-import { hieroPlugin } from '@hiero-hackers/enterprise-fastify';
+import { createHiero, toHttpError } from './hiero.js';
 
-await app.register(hieroPlugin);
+const hiero = createHiero(); // reads HIERO_* env vars
+app.addHook('onClose', () => hiero.close());
+
+app.get('/api/balance', () => hiero.accountService.getOperatorAccountBalance());
 ```
 
-All services become available at `app.hiero`:
+`hiero` exposes:
 
-- **Services**: `accountService`, `fileService`, `tokenService`, `contractService`, `topicService`
-- **Repositories**: `accountRepository`, `nftRepository`, `tokenRepository`, `topicRepository`, `transactionRepository`, `networkRepository`
-- **Infra**: `context`
+- **Services** (core): `accountService`, `topicService`. Add any other core service the same way.
+- **Repositories** (mirror): `accountRepository`, `nftRepository`, `tokenRepository`, `topicRepository`, `transactionRepository`, `networkRepository`, and the rest of `createMirrorRepositories()`.
+- **`close()`**: releases the SDK client.
 
-The plugin automatically cleans up the SDK client when the Fastify server shuts down.
+A `setErrorHandler` uses `toHttpError()` to turn `HieroError` / `MirrorError` codes into HTTP statuses (`NOT_FOUND` → 404, `TIMED_OUT` → 504, mirror failures → 502). Any other error keeps Fastify's default handling.

@@ -2,7 +2,7 @@
     "name": "hiero-express-sample",
     "version": "1.0.0",
     "private": true,
-    "description": "Sample Express app using @hiero-hackers/enterprise-express",
+    "description": "Sample Express app using @hiero-hackers/enterprise-core and @hiero-hackers/enterprise-mirror",
     "type": "module",
     "scripts": {
         "dev": "tsx src/app.ts",
@@ -10,7 +10,8 @@
         "start": "node dist/app.js"
     },
     "dependencies": {
-        "@hiero-hackers/enterprise-express": "workspace:*",
+        "@hiero-hackers/enterprise-core": "workspace:*",
+        "@hiero-hackers/enterprise-mirror": "workspace:*",
         "dotenv": "^17.4.2",
         "express": "^5.1.0"
     },

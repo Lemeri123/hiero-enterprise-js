@@ -1,12 +1,14 @@
 # Samples
 
-Sample projects demonstrating how to use `@hiero-hackers/*` packages with different Node.js frameworks.
+Sample projects demonstrating how to use `@hiero-hackers/enterprise-core` and `@hiero-hackers/enterprise-mirror` with different Node.js frameworks. No framework-specific package is needed: each sample wires the services itself in one small file you can copy into your own app.
 
-| Sample | Framework | Port | Integration Style |
-|--------|-----------|------|-------------------|
-| [express-sample](./express-sample) | Express | 3000 | Middleware — `req.hiero.*` |
-| [fastify-sample](./fastify-sample) | Fastify | 3001 | Plugin — `app.hiero.*` |
-| [nest-sample](./nest-sample) | NestJS | 3002 | DI — `@Inject()` constructors |
+| Sample | Framework | Port | Wiring |
+|--------|-----------|------|--------|
+| [express-sample](./express-sample) | Express | 3000 | [`src/hiero.ts`](./express-sample/src/hiero.ts): services created once, shared by every route |
+| [fastify-sample](./fastify-sample) | Fastify | 3001 | [`src/hiero.ts`](./fastify-sample/src/hiero.ts): same, closed from an `onClose` hook |
+| [nest-sample](./nest-sample) | NestJS | 3002 | [`src/hiero.module.ts`](./nest-sample/src/hiero.module.ts): providers injected by type |
+
+Each sample also maps `HieroError` / `MirrorError` codes to HTTP statuses, so a missing account returns 404 rather than 500. These samples replace the deprecated `@hiero-hackers/enterprise-express`, `-fastify` and `-nest` packages; see [Migrating from the framework adapters](../README.md#migrating-from-the-framework-adapters).
 
 Also in this directory: [examples](./examples), a gallery of standalone
 scripts by domain (account, token, topic, …, mirror). The mirror scripts
@@ -48,7 +50,7 @@ All three samples expose the same REST API:
 | `GET` | `/api/balance` | Get the operator account HBAR balance |
 | `GET` | `/api/accounts/:id` | Look up an account by ID (Mirror Node) |
 | `GET` | `/api/accounts/:id/nfts` | List NFTs owned by an account |
-| `POST` | `/api/accounts` | Create a new account on-chain *(NestJS only)* |
+| `POST` | `/api/accounts` | Create a new account on-chain *(Express and NestJS)* |
 
 ### Tokens
 
