@@ -50,6 +50,11 @@ All published packages (`@hiero-hackers/enterprise-core`, `-mirror`, `-express`,
 
 ### Fixed
 
+- `enterprise-core`: a throwing `onAfterTransaction` listener no longer turns a
+  successful transaction or query into an error, fires the after-event twice, or
+  replaces the original error on failure ([#245], [#269]). The error is reported
+  as a `HIERO_LISTENER_ERROR` process warning and the remaining listeners still
+  run. A throwing `onBeforeTransaction` listener still aborts the transaction.
 - Fixed `HieroContext` leaking an SDK client when the operator credentials are invalid; credentials are now parsed before the client is created, and a malformed `operatorId` throws a `HieroError` with `CONFIG_INVALID` instead of a raw SDK error. [#271](https://github.com/hiero-hackers/hiero-enterprise-js/pull/271) [#246](https://github.com/hiero-hackers/hiero-enterprise-js/issues/246)
 
 ### Security
@@ -244,3 +249,5 @@ npm registry ([#126], [#133]).
 [#201]: https://github.com/hiero-hackers/hiero-enterprise-js/pull/201
 [#212]: https://github.com/hiero-hackers/hiero-enterprise-js/pull/212
 [#238]: https://github.com/hiero-hackers/hiero-enterprise-js/issues/238
+[#245]: https://github.com/hiero-hackers/hiero-enterprise-js/issues/245
+[#269]: https://github.com/hiero-hackers/hiero-enterprise-js/pull/269
