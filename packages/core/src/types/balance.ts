@@ -1,13 +1,11 @@
 /**
- * HBAR and token balance for an account.
+ * HBAR balance of an account.
  */
 export interface Balance {
     /** Account ID */
     accountId: string;
     /** HBAR balance in tinybars — decimal string; `BigInt(x)` for arithmetic */
     tinybars: string;
-    /** Token balances associated with this account */
-    tokens: TokenBalance[];
 }
 
 /**

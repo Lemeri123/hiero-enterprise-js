@@ -30,8 +30,9 @@ describe("AccountService.deleteAccount [Integration]", () => {
         });
         await waitForMirrorNodeRecord();
 
-        await expect(
-            client.getAccountBalance(account.accountId),
-        ).rejects.toThrow(/ACCOUNT_DELETED/);
+        // The mirror node keeps deleted accounts; the 5 HBAR moved to the
+        // transfer account.
+        const balance = await client.getAccountBalance(account.accountId);
+        expect(balance.tinybars).toBe("0");
     });
 });

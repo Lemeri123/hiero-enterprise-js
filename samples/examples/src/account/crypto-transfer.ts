@@ -28,7 +28,7 @@ import {
     PrivateKey,
     Hbar,
 } from "@hiero-hackers/enterprise-core";
-import { getED25519Config } from "../env.js";
+import { getED25519Config, waitForMirror } from "../env.js";
 
 /**
  * Demonstrates a direct HBAR transfer between two accounts.
@@ -71,6 +71,7 @@ async function transferHbar(accountService: AccountService) {
     // explorer links, mirror node lookups, or payment correlation.
     console.log("Transferred:", result.transactionId, result.status);
 
+    await waitForMirror();
     const balance = await accountService.getAccountBalance(receiver.accountId);
     console.log("Receiver balance:", balance.tinybars, "tinybars");
     console.log();
@@ -148,9 +149,12 @@ async function transferToken(
         },
     );
 
-    const balance = await accountService.getAccountBalance(receiver.accountId);
-    const held = balance.tokens.find((t) => t.tokenId === tokenId.toString());
-    console.log("Receiver token balance:", held?.balance);
+    await waitForMirror();
+    const { balance } = await accountService.getTokenBalance(
+        receiver.accountId,
+        tokenId,
+    );
+    console.log("Receiver token balance:", balance);
     console.log();
 }
 

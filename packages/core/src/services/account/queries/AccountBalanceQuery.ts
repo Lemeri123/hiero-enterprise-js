@@ -1,46 +1,26 @@
 import type { AccountId } from "@hiero-ledger/sdk";
-import { AccountBalanceQuery as SdkAccountBalanceQuery } from "@hiero-ledger/sdk";
+import { MirrorNodeAccountBalanceQuery } from "@hiero-ledger/sdk";
 import type { Balance } from "../../../types/index.js";
 import type { IHieroContext } from "../../../context/index.js";
 import { normalizeError } from "../../../errors/index.js";
-import { QueryExecutor } from "../../transaction/index.js";
-import type { QueryOptions } from "../../transaction/index.js";
 
+/**
+ * Reads an account's HBAR balance from the mirror node. Custom networks
+ * need `mirrorNetwork` and `mirrorNodeUrl` set in the config.
+ */
 export class AccountBalanceQuery {
-    private readonly executor: QueryExecutor;
-
-    constructor(context: IHieroContext) {
-        this.executor = new QueryExecutor(context);
-    }
+    constructor(private readonly context: IHieroContext) {}
 
     /** Get account balance execute handler. */
-    async execute(
-        accountId: string | AccountId,
-        options: QueryOptions = {},
-    ): Promise<Balance> {
+    async execute(accountId: string | AccountId): Promise<Balance> {
         try {
-            const query = new SdkAccountBalanceQuery().setAccountId(accountId);
-            const balance = await this.executor.run(query, options, {
-                type: "AccountBalanceQuery",
-                serviceName: "AccountService",
-                methodName: "getAccountBalance",
-                timestamp: new Date(),
-            });
-            const tokens = [];
-            if (balance.tokens) {
-                for (const [tokenId, amount] of balance.tokens) {
-                    tokens.push({
-                        tokenId: tokenId.toString(),
-                        balance: amount.toString(),
-                        decimals: balance.tokenDecimals?.get(tokenId) ?? 0,
-                    });
-                }
-            }
+            const balance = await new MirrorNodeAccountBalanceQuery()
+                .setAccountId(accountId)
+                .execute(this.context.client);
 
             return {
                 accountId: accountId.toString(),
                 tinybars: balance.hbars.toTinybars().toString(),
-                tokens,
             };
         } catch (error) {
             throw normalizeError(error, "AccountService.getAccountBalance");

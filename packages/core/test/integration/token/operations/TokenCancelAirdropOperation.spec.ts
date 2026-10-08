@@ -10,14 +10,14 @@ import {
     TokenService,
 } from "../../../../src/services/index.js";
 import { NftId, PendingAirdropId } from "@hiero-ledger/sdk";
-import type { TokenId } from "@hiero-ledger/sdk";
+import type { AccountId, TokenId } from "@hiero-ledger/sdk";
 
-function tokenBalanceFor(
-    balance: { tokens: { tokenId: string; balance: string }[] },
+async function tokenBalanceFor(
+    accountService: AccountService,
+    accountId: string | AccountId,
     tokenId: string | TokenId,
-): string | undefined {
-    return balance.tokens.find((t) => t.tokenId === tokenId.toString())
-        ?.balance;
+): Promise<string> {
+    return (await accountService.getTokenBalance(accountId, tokenId)).balance;
 }
 
 describe("TokenService cancel airdrop operations [Integration]", () => {
@@ -62,10 +62,9 @@ describe("TokenService cancel airdrop operations [Integration]", () => {
         await waitForMirrorNodeRecord();
 
         // Sanity: the pending airdrop has not credited the receiver.
-        const beforeCancel = await accountService.getAccountBalance(
-            receiver.accountId,
-        );
-        expect(tokenBalanceFor(beforeCancel, tokenId)).toBeUndefined();
+        expect(
+            await tokenBalanceFor(accountService, receiver.accountId, tokenId),
+        ).toBe("0");
 
         // The sender (owner) cancels the pending airdrop.
         await tokenService.cancelAirdrop({
@@ -82,17 +81,15 @@ describe("TokenService cancel airdrop operations [Integration]", () => {
         await waitForMirrorNodeRecord();
 
         // The receiver was never credited (cancel removed the pending entry).
-        const afterCancel = await accountService.getAccountBalance(
-            receiver.accountId,
-        );
-        expect(tokenBalanceFor(afterCancel, tokenId)).toBeUndefined();
+        expect(
+            await tokenBalanceFor(accountService, receiver.accountId, tokenId),
+        ).toBe("0");
 
         // The owner (treasury) still holds the full supply: the escrow was
         // released back to the sender's available balance.
-        const ownerBalance = await accountService.getAccountBalance(
-            owner.accountId,
-        );
-        expect(tokenBalanceFor(ownerBalance, tokenId)).toBe("100");
+        expect(
+            await tokenBalanceFor(accountService, owner.accountId, tokenId),
+        ).toBe("100");
     });
 
     it("cancels a pending NFT airdrop so the serial stays with the treasury", async () => {
@@ -125,11 +122,9 @@ describe("TokenService cancel airdrop operations [Integration]", () => {
         });
 
         await waitForMirrorNodeRecord();
-
-        const beforeCancel = await accountService.getAccountBalance(
-            receiver.accountId,
-        );
-        expect(tokenBalanceFor(beforeCancel, tokenId)).toBeUndefined();
+        expect(
+            await tokenBalanceFor(accountService, receiver.accountId, tokenId),
+        ).toBe("0");
 
         await tokenService.cancelAirdrop({
             pendingAirdropIds: [
@@ -143,17 +138,14 @@ describe("TokenService cancel airdrop operations [Integration]", () => {
         });
 
         await waitForMirrorNodeRecord();
-
-        const afterCancel = await accountService.getAccountBalance(
-            receiver.accountId,
-        );
-        expect(tokenBalanceFor(afterCancel, tokenId)).toBeUndefined();
+        expect(
+            await tokenBalanceFor(accountService, receiver.accountId, tokenId),
+        ).toBe("0");
 
         // The owner (treasury) still holds the minted serial.
-        const ownerBalance = await accountService.getAccountBalance(
-            owner.accountId,
-        );
-        expect(tokenBalanceFor(ownerBalance, tokenId)).toBe("1");
+        expect(
+            await tokenBalanceFor(accountService, owner.accountId, tokenId),
+        ).toBe("1");
     });
 
     it("cancels a mixed batch of pending fungible and NFT airdrops in one transaction", async () => {
@@ -228,19 +220,29 @@ describe("TokenService cancel airdrop operations [Integration]", () => {
         });
 
         await waitForMirrorNodeRecord();
-
-        const receiverBalance = await accountService.getAccountBalance(
-            receiver.accountId,
-        );
         expect(
-            tokenBalanceFor(receiverBalance, fungibleTokenId),
-        ).toBeUndefined();
-        expect(tokenBalanceFor(receiverBalance, nftTokenId)).toBeUndefined();
-
-        const ownerBalance = await accountService.getAccountBalance(
-            owner.accountId,
-        );
-        expect(tokenBalanceFor(ownerBalance, fungibleTokenId)).toBe("100");
-        expect(tokenBalanceFor(ownerBalance, nftTokenId)).toBe("1");
+            await tokenBalanceFor(
+                accountService,
+                receiver.accountId,
+                fungibleTokenId,
+            ),
+        ).toBe("0");
+        expect(
+            await tokenBalanceFor(
+                accountService,
+                receiver.accountId,
+                nftTokenId,
+            ),
+        ).toBe("0");
+        expect(
+            await tokenBalanceFor(
+                accountService,
+                owner.accountId,
+                fungibleTokenId,
+            ),
+        ).toBe("100");
+        expect(
+            await tokenBalanceFor(accountService, owner.accountId, nftTokenId),
+        ).toBe("1");
     });
 });

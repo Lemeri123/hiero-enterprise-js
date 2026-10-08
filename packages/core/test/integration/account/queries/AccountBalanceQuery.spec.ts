@@ -27,8 +27,6 @@ describe("AccountBalanceQuery (via AccountService) [Integration]", () => {
 
         expect(balance.accountId).toBe(account.accountId.toString());
         expect(balance.tinybars).toBe(String(7 * 100_000_000));
-        // Newly created account has no associated tokens
-        expect(balance.tokens).toEqual([]);
     });
 
     it("fetches the balance for the configured operator account", async () => {

@@ -103,15 +103,15 @@ describe("ContractCreateValidator", () => {
             ).toThrow(/initialBalance must not be negative/);
         });
 
-        it("throws when initialBalance is negative (bigint)", () => {
+        it("throws when initialBalance is a bigint", () => {
             expect(() =>
                 validator.validate({
                     ...baseOptions,
-                    // Deliberately outside the declared type: the validator
-                    // must reject bad runtime values from untyped JS callers.
-                    initialBalance: -1n as never,
+                    // Not in the declared type: untyped JS callers could still
+                    // pass one, and the SDK would send 0 HBAR.
+                    initialBalance: 5n as never,
                 }),
-            ).toThrow(/initialBalance must not be negative/);
+            ).toThrow(/initialBalance must be .* not a bigint/);
         });
 
         it("throws when initialBalance is a negative Long", () => {

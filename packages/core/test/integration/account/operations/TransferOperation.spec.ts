@@ -38,10 +38,14 @@ describe("TransferOperation [Integration]", () => {
         it("transfers HBAR from the operator to a recipient", async () => {
             const receiver = await createTestAccount(client, 0);
 
+            await waitForMirrorNodeRecord();
+
             const before = await client.getAccountBalance(receiver.accountId);
             const beforeTinybars = BigInt(before.tinybars);
 
             await client.transferHbar(receiver.accountId, 1, operatorAccountId);
+
+            await waitForMirrorNodeRecord();
 
             const after = await client.getAccountBalance(receiver.accountId);
             const afterTinybars = BigInt(after.tinybars);
@@ -54,12 +58,16 @@ describe("TransferOperation [Integration]", () => {
             const sender = await createTestAccount(client, 5);
             const receiver = await createTestAccount(client, 0);
 
+            await waitForMirrorNodeRecord();
+
             const before = await client.getAccountBalance(receiver.accountId);
             const beforeTinybars = BigInt(before.tinybars);
 
             await client.transferHbar(receiver.accountId, 1, sender.accountId, {
                 additionalSigners: [sender.key],
             });
+
+            await waitForMirrorNodeRecord();
 
             const after = await client.getAccountBalance(receiver.accountId);
             const afterTinybars = BigInt(after.tinybars);
@@ -101,12 +109,15 @@ describe("TransferOperation [Integration]", () => {
                 operatorAccountId,
             );
 
-            const balance = await client.getAccountBalance(receiver.accountId);
-            const tokenBalance = balance.tokens.find(
-                (t) => t.tokenId === tokenId.toString(),
+            await waitForMirrorNodeRecord();
+
+            const { balance } = await client.getTokenBalance(
+                receiver.accountId,
+
+                tokenId,
             );
-            expect(tokenBalance).toBeDefined();
-            expect(tokenBalance!.balance).toBe("250");
+
+            expect(balance).toBe("250");
         });
 
         it("transfers tokens with matching expectedDecimals", async () => {
@@ -136,11 +147,15 @@ describe("TransferOperation [Integration]", () => {
                 { expectedDecimals: 4 },
             );
 
-            const balance = await client.getAccountBalance(receiver.accountId);
-            const tokenBalance = balance.tokens.find(
-                (t) => t.tokenId === tokenId.toString(),
+            await waitForMirrorNodeRecord();
+
+            const { balance } = await client.getTokenBalance(
+                receiver.accountId,
+
+                tokenId,
             );
-            expect(tokenBalance!.balance).toBe("100");
+
+            expect(balance).toBe("100");
         });
 
         it("transfers tokens between two non-operator accounts", async () => {
@@ -170,11 +185,15 @@ describe("TransferOperation [Integration]", () => {
                 { additionalSigners: [owner.key] },
             );
 
-            const balance = await client.getAccountBalance(spender.accountId);
-            const tokenBalance = balance.tokens.find(
-                (t) => t.tokenId === tokenId.toString(),
+            await waitForMirrorNodeRecord();
+
+            const { balance } = await client.getTokenBalance(
+                spender.accountId,
+
+                tokenId,
             );
-            expect(tokenBalance!.balance).toBe("100");
+
+            expect(balance).toBe("100");
         });
     });
 

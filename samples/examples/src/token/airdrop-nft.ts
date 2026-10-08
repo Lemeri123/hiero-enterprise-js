@@ -27,23 +27,22 @@
  * Run: pnpm tsx src/token/airdrop-nft.ts
  */
 
-import type { TokenId } from "@hiero-hackers/enterprise-core";
+import type { AccountId, TokenId } from "@hiero-hackers/enterprise-core";
 import {
     AccountService,
     AccountType,
     HieroContext,
     PrivateKey,
     TokenService,
-    type Balance,
 } from "@hiero-hackers/enterprise-core";
-import { getED25519Config } from "../env.js";
+import { getED25519Config, waitForMirror } from "../env.js";
 
-function tokenBalanceFor(
-    balance: Balance,
+async function tokenBalanceFor(
+    accountService: AccountService,
+    accountId: string | AccountId,
     tokenId: string | TokenId,
-): string | undefined {
-    return balance.tokens.find((t) => t.tokenId === tokenId.toString())
-        ?.balance;
+): Promise<string> {
+    return (await accountService.getTokenBalance(accountId, tokenId)).balance;
 }
 
 async function createKeyedAccount(
@@ -128,10 +127,10 @@ async function multiReceiverImmediateCredit(
 
     console.log("Collection:", tokenId);
     for (const r of [receiver1, receiver2, receiver3]) {
-        const balance = await accountService.getAccountBalance(r.accountId);
+        await waitForMirror();
         console.log(
             `  ${r.accountId} NFTs held:`,
-            tokenBalanceFor(balance, tokenId) ?? "0",
+            await tokenBalanceFor(accountService, r.accountId, tokenId),
         );
     }
     console.log();
@@ -184,8 +183,12 @@ async function pendingAirdropToUnassociatedReceiver(
         additionalSigners: [owner.key],
     });
 
-    const balance = await accountService.getAccountBalance(receiver.accountId);
-    const credited = tokenBalanceFor(balance, tokenId);
+    await waitForMirror();
+    const credited = await tokenBalanceFor(
+        accountService,
+        receiver.accountId,
+        tokenId,
+    );
 
     console.log("Collection:", tokenId);
     console.log("Receiver account:", receiver.accountId);
@@ -261,26 +264,20 @@ async function mixedBatch(
         additionalSigners: [owner.key],
     });
 
-    const associatedBalance = await accountService.getAccountBalance(
-        associated.accountId,
-    );
-    const unassociatedBalance = await accountService.getAccountBalance(
-        unassociated.accountId,
-    );
+    await waitForMirror();
 
     console.log("Collection:", tokenId);
     console.log(
         "  Associated receiver",
         associated.accountId,
         "NFTs held:",
-        tokenBalanceFor(associatedBalance, tokenId) ?? "0",
+        await tokenBalanceFor(accountService, associated.accountId, tokenId),
     );
     console.log(
         "  Unassociated receiver",
         unassociated.accountId,
         "NFTs held:",
-        tokenBalanceFor(unassociatedBalance, tokenId) ??
-            "<no relationship — pending airdrop>",
+        await tokenBalanceFor(accountService, unassociated.accountId, tokenId),
     );
     console.log();
 }
