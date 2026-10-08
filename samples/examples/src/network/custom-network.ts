@@ -6,8 +6,7 @@
  *  - its consensus nodes, given as `networkNodes`
  *    (`"host:port"` → node account ID, or `HIERO_NETWORK_NODES`);
  *  - its mirror node, set on the client. Balances are read from the
- *    mirror node; the SDK reads a local mirror node's REST API on
- *    port 5551.
+ *    mirror node.
  *
  * Run: HIERO_NETWORK_NODES="127.0.0.1:50211=0.0.3" pnpm tsx src/network/custom-network.ts
  */

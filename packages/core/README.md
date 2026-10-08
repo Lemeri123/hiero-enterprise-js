@@ -92,8 +92,7 @@ const context = new HieroContext({
 context.client.setMirrorNetwork(["localhost:5600"]);
 ```
 
-The mirror network is needed for balances and topic subscriptions. The
-SDK reads a local mirror node's REST API on port 5551. See
+The mirror network is needed for balances and topic subscriptions. See
 [`custom-network.ts`](../../samples/examples/src/network/custom-network.ts).
 
 Runnable examples for every service:

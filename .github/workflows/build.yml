@@ -85,8 +85,6 @@ jobs:
               id: solo
               with:
                   installMirrorNode: true
-                  # The SDK expects a local mirror node's REST API on 5551.
-                  mirrorNodePortRest: 5551
                   nodeVersion: ${{ matrix.node-version }}
 
             - name: Wait for Mirror Node
@@ -94,7 +92,7 @@ jobs:
                   echo "Waiting for Mirror Node REST API to be ready..."
                   REST_READY=""
                   for i in $(seq 1 60); do
-                    if curl -s http://localhost:5551/api/v1/accounts | grep -q "accounts"; then
+                    if curl -s http://localhost:38081/api/v1/accounts | grep -q "accounts"; then
                       echo "Mirror Node is ready!"
                       REST_READY="yes"
                       break
@@ -103,11 +101,11 @@ jobs:
                     sleep 5
                   done
                   if [ -z "$REST_READY" ]; then
-                    echo "::error::Mirror Node REST on http://localhost:5551 never became reachable" >&2
+                    echo "::error::Mirror Node REST on http://localhost:38081 never became reachable" >&2
                     exit 1
                   fi
               env:
-                  HIERO_MIRROR_NODE_URL: http://localhost:5551
+                  HIERO_MIRROR_NODE_URL: http://localhost:38081
 
             - name: Wait for Mirror Node gRPC (consensus stream)
               run: |
@@ -134,7 +132,7 @@ jobs:
                   HIERO_OPERATOR_KEY: ${{ steps.solo.outputs.privateKey }}
                   HIERO_OPERATOR_KEY_TYPE: DER
                   HIERO_NETWORK_NODES: "127.0.0.1:35211=0.0.3"
-                  HIERO_MIRROR_NODE_URL: http://localhost:5551
+                  HIERO_MIRROR_NODE_URL: http://localhost:38081
               run: pnpm --filter @hiero-hackers/enterprise-core run test:integration:coverage
 
             - name: Report integration coverage
@@ -215,7 +213,7 @@ jobs:
                   HIERO_ED25519_OPERATOR_KEY: ${{ steps.solo.outputs.ed25519PrivateKey }}
                   HIERO_ECDSA_OPERATOR_ID: ${{ steps.solo.outputs.ecdsaAccountId }}
                   HIERO_ECDSA_OPERATOR_KEY: ${{ steps.solo.outputs.ecdsaPrivateKey }}
-                  HIERO_MIRROR_NODE_URL: http://localhost:5551
+                  HIERO_MIRROR_NODE_URL: http://localhost:38081
                   HIERO_NETWORK_NODES: "127.0.0.1:35211=0.0.3"
               run: pnpm --filter @hiero-hackers/examples examples
 
@@ -232,5 +230,5 @@ jobs:
                   HIERO_OPERATOR_KEY: ${{ steps.solo.outputs.privateKey }}
                   HIERO_OPERATOR_KEY_TYPE: DER
                   HIERO_NETWORK_NODES: "127.0.0.1:35211=0.0.3"
-                  HIERO_MIRROR_NODE_URL: http://localhost:5551
+                  HIERO_MIRROR_NODE_URL: http://localhost:38081
               run: pnpm --filter @hiero-hackers/enterprise-mirror run test:integration
