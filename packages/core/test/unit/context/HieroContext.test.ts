@@ -67,7 +67,10 @@ describe("HieroContext", () => {
         it("creates a context with valid explicit config", () => {
             const ctx = new HieroContext(validConfig);
 
-            expect(ctx.config).toEqual(validConfig);
+            expect(ctx.config).toEqual({
+                ...validConfig,
+                operatorKey: "[redacted]",
+            });
             expect(ctx.operatorAccountId.toString()).toBe("0.0.2");
             expect(ctx.operatorPublicKey.toString()).toBe(
                 "mock-public-key-der",
@@ -93,7 +96,10 @@ describe("HieroContext", () => {
 
             const ctx = new HieroContext();
 
-            expect(ctx.config).toEqual(validConfig);
+            expect(ctx.config).toEqual({
+                ...validConfig,
+                operatorKey: "[redacted]",
+            });
             expect(configModule.assertEnvConfigValid).toHaveBeenCalled();
             expect(configModule.resolveConfigFromEnv).toHaveBeenCalled();
         });
@@ -188,10 +194,8 @@ describe("HieroContext", () => {
         it("exposes operatorPublicKey but not the raw key", () => {
             const ctx = new HieroContext(validConfig);
             expect(ctx.operatorPublicKey).toBeDefined();
-            // The private key is not on the public interface
-            expect(
-                (ctx as unknown as Record<string, unknown>)["_operatorKey"],
-            ).toBeDefined();
+            // The private key is a #private field, not a property
+            expect(Object.keys(ctx)).not.toContain("_operatorKey");
             expect("operatorKey" in ctx).toBe(false);
         });
 
