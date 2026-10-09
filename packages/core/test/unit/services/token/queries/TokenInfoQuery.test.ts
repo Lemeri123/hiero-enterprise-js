@@ -64,7 +64,7 @@ describe("TokenInfoQuery (via TokenService)", () => {
 
     /** The query sent to the network. */
     const sentQuery = (call = 0) =>
-        execute.mock.contexts[call] as SdkTokenInfoQuery;
+        execute.mock.contexts.at(call) as SdkTokenInfoQuery;
 
     beforeEach(() => {
         execute = vi
