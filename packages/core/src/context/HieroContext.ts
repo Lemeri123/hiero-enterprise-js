@@ -97,19 +97,15 @@ export class HieroContext implements IHieroContext {
 
     /**
      * The operator private key. TypeScript `private readonly` is not enough:
-     * it is a plain property at runtime, so `util.inspect` prints it.
-     * `#private` keeps it out of logs and inspection.
+     * it is still a plain property at runtime, so the key still leaks through
+     * `console.log` and `util.inspect`. `#private` hides it.
      */
     readonly #operatorKey: PrivateKey;
 
     /** The underlying Hiero SDK Client */
     public readonly client: Client;
 
-    /**
-     * A copy of the resolved configuration, with `operatorKey` redacted.
-     * Making it `private readonly` would not hide the key from
-     * `util.inspect`, so the key is removed instead.
-     */
+    /** A copy of the resolved configuration, with `operatorKey` redacted */
     public readonly config: HieroConfig;
 
     /** The operator account ID */
