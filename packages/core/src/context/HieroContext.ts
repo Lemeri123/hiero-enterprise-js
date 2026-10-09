@@ -95,13 +95,17 @@ export class HieroContext implements IHieroContext {
     /** Registered transaction listeners */
     private readonly listeners: TransactionListener[] = [];
 
-    /** The operator private key — kept private to prevent accidental leakage */
-    private readonly _operatorKey: PrivateKey;
+    /**
+     * The operator private key. TypeScript `private readonly` is not enough:
+     * it is still a plain property at runtime, so the key still leaks through
+     * `console.log` and `util.inspect`. `#private` hides it.
+     */
+    readonly #operatorKey: PrivateKey;
 
     /** The underlying Hiero SDK Client */
     public readonly client: Client;
 
-    /** The resolved configuration */
+    /** A copy of the resolved configuration, with `operatorKey` redacted */
     public readonly config: HieroConfig;
 
     /** The operator account ID */
@@ -115,7 +119,7 @@ export class HieroContext implements IHieroContext {
             assertEnvConfigValid();
         }
         const resolved = config ?? resolveConfigFromEnv()!;
-        this.config = resolved;
+        this.config = { ...resolved, operatorKey: "[redacted]" };
 
         // Parse credentials before creating the client, so invalid config
         // never leaves an open client behind.
@@ -132,7 +136,7 @@ export class HieroContext implements IHieroContext {
         }
 
         try {
-            this._operatorKey = parsePrivateKey(
+            this.#operatorKey = parsePrivateKey(
                 resolved.operatorKey,
                 resolved.operatorKeyType,
             );
@@ -174,7 +178,7 @@ export class HieroContext implements IHieroContext {
             );
         }
 
-        this.client.setOperator(this.operatorAccountId, this._operatorKey);
+        this.client.setOperator(this.operatorAccountId, this.#operatorKey);
 
         if (resolved.mirrorNetwork) {
             this.client.setMirrorNetwork(resolved.mirrorNetwork);
@@ -253,7 +257,7 @@ export class HieroContext implements IHieroContext {
      * Get the operator's public key (safe to expose).
      */
     public get operatorPublicKey() {
-        return this._operatorKey.publicKey;
+        return this.#operatorKey.publicKey;
     }
 
     /**
@@ -261,7 +265,7 @@ export class HieroContext implements IHieroContext {
      * Use this instead of accessing the private key directly.
      */
     public async signTransaction<T extends Transaction>(tx: T): Promise<T> {
-        return tx.sign(this._operatorKey);
+        return tx.sign(this.#operatorKey);
     }
 
     /**
