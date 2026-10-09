@@ -2,6 +2,8 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { inspect } from "node:util";
 import {
     Client,
+    DefaultHttpTransport,
+    MirrorNodeAccountBalanceQuery,
     PrivateKey,
     TransactionId,
     TransferTransaction,
@@ -355,5 +357,113 @@ describe("HieroContext", () => {
             expect(ctx.client.minBackoff).toBe(500);
             expect(ctx.client.maxBackoff).toBe(8000);
         });
+    });
+
+    describe("Timeouts", () => {
+        it("applies grpcDeadlineMs", () => {
+            const ctx = create({ ...validConfig, grpcDeadlineMs: 2000 });
+
+            expect(ctx.client.grpcDeadline).toBe(2000);
+        });
+
+        it("leaves the SDK default deadline when grpcDeadlineMs is unset", () => {
+            const defaultDeadline = create(validConfig).client.grpcDeadline;
+
+            expect(
+                create({ ...validConfig, requestTimeoutMs: 60000 }).client
+                    .grpcDeadline,
+            ).toBe(defaultDeadline);
+        });
+
+        // The SDK warns whenever the gRPC deadline is not below the request
+        // timeout, checking against the other value's current setting.
+        it.each([
+            ["lowering both", { requestTimeoutMs: 5000, grpcDeadlineMs: 2000 }],
+            [
+                "raising both",
+                { requestTimeoutMs: 300000, grpcDeadlineMs: 150000 },
+            ],
+        ])("applies a valid pair without SDK warnings (%s)", (_, timeouts) => {
+            const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+            const ctx = create({ ...validConfig, ...timeouts });
+
+            expect(ctx.client.requestTimeout).toBe(timeouts.requestTimeoutMs);
+            expect(ctx.client.grpcDeadline).toBe(timeouts.grpcDeadlineMs);
+            expect(warn).not.toHaveBeenCalled();
+        });
+
+        it("still lets the SDK warn about an inverted pair", () => {
+            const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+            create({
+                ...validConfig,
+                requestTimeoutMs: 2000,
+                grpcDeadlineMs: 5000,
+            });
+
+            expect(warn).toHaveBeenCalled();
+        });
+    });
+
+    describe("Mirror node", () => {
+        const localConfig = {
+            ...validConfig,
+            network: "local",
+            networkNodes: { "127.0.0.1:50211": "0.0.3" },
+        };
+
+        it("applies mirrorNetwork to the client", () => {
+            const ctx = create({
+                ...localConfig,
+                mirrorNetwork: ["localhost:5600"],
+            });
+
+            expect(ctx.client.mirrorNetwork).toEqual(["localhost:5600"]);
+        });
+
+        it("leaves the client's mirror network empty when mirrorNetwork is unset", () => {
+            expect(create(localConfig).client.mirrorNetwork).toEqual([]);
+        });
+
+        it("sends mirror REST calls to mirrorNodeUrl", async () => {
+            const ctx = create({
+                ...localConfig,
+                mirrorNetwork: ["localhost:5600"],
+                mirrorNodeUrl: "http://localhost:38081",
+            });
+            const roundTrip = vi
+                .spyOn(DefaultHttpTransport.prototype, "roundTrip")
+                .mockRejectedValue(new Error("stop"));
+
+            await new MirrorNodeAccountBalanceQuery()
+                .setAccountId("0.0.2")
+                .execute(ctx.client)
+                .catch(() => undefined);
+
+            expect(roundTrip.mock.calls[0][0].url).toMatch(
+                /^http:\/\/localhost:38081\/api\/v1\//,
+            );
+        });
+
+        it("keeps the SDK's mirror transport when mirrorNodeUrl is unset", () => {
+            const ctx = create({
+                ...localConfig,
+                mirrorNetwork: ["localhost:5600"],
+            });
+
+            expect(ctx.client.getMirrorNodeHttpConfig().transport).toBeNull();
+        });
+
+        it.each(["localhost:5551", "not a url"])(
+            "rejects the invalid mirrorNodeUrl %s",
+            (mirrorNodeUrl) => {
+                expect(() => create({ ...localConfig, mirrorNodeUrl })).toThrow(
+                    expect.objectContaining({
+                        code: HieroErrorCodes.ConfigInvalid,
+                    }),
+                );
+            },
+        );
     });
 });
