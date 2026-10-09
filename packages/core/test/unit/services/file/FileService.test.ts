@@ -26,9 +26,14 @@ describe("FileService [partial content failure]", () => {
             ).mockResolvedValueOnce({
                 fileId: mockFileId,
                 status: "SUCCESS",
+                transactionId: "0.0.2@1700000000.000",
             } as never);
 
-            const appendError = new Error("Missing required signatures");
+            const appendError = new HieroError("Missing required signatures", {
+                code: HieroErrorCodes.SdkError,
+                sdkStatus: "INVALID_SIGNATURE",
+                transactionId: "0.0.2@1234567890.000",
+            });
             vi.spyOn(
                 service["appendOperation"],
                 "execute",
@@ -45,8 +50,10 @@ describe("FileService [partial content failure]", () => {
                 "appending the remainder of its contents failed",
             );
             expect(error.fileId).toBe("0.0.12345");
+            expect(error.transactionId).toBe("0.0.2@1700000000.000");
             expect(error.code).toBe(HieroErrorCodes.SdkError);
             expect(error.context).toBe("FileService.createFile");
+            expect(error.cause).toBe(appendError);
         });
 
         it("does not wrap error when contents fit in single transaction", async () => {
@@ -85,7 +92,11 @@ describe("FileService [partial content failure]", () => {
                 transactionId: "0.0.3@9876543210.000",
             } as never);
 
-            const appendError = new Error("Insufficient transaction fee");
+            const appendError = new HieroError("Insufficient transaction fee", {
+                code: HieroErrorCodes.SdkError,
+                sdkStatus: "INSUFFICIENT_TX_FEE",
+                transactionId: "0.0.2@1234567890.000",
+            });
             vi.spyOn(
                 service["appendOperation"],
                 "execute",
@@ -108,6 +119,7 @@ describe("FileService [partial content failure]", () => {
             expect(error.transactionId).toBe("0.0.3@9876543210.000");
             expect(error.code).toBe(HieroErrorCodes.SdkError);
             expect(error.context).toBe("FileService.updateFile");
+            expect(error.cause).toBe(appendError);
         });
 
         it("does not wrap error when contents fit in single transaction", async () => {
@@ -157,18 +169,16 @@ describe("FileService [partial content failure]", () => {
                 transactionId: "0.0.3@5555555555.000",
             } as never);
 
-            const sdkError = new Error("INVALID_SIGNATURE") as never;
-            (sdkError as never as Record<string, unknown>).status = {
-                toString: () => "INVALID_SIGNATURE",
-            };
-            (sdkError as never as Record<string, unknown>).transactionId = {
-                toString: () => "0.0.2@1234567890.000",
-            };
+            const appendError = new HieroError("INVALID_SIGNATURE", {
+                code: HieroErrorCodes.SdkError,
+                sdkStatus: "INVALID_SIGNATURE",
+                transactionId: "0.0.2@1234567890.000",
+            });
 
             vi.spyOn(
                 service["appendOperation"],
                 "execute",
-            ).mockRejectedValueOnce(sdkError);
+            ).mockRejectedValueOnce(appendError);
 
             await expect(
                 service.updateFile({ fileId, contents: largeContents }),
@@ -177,6 +187,7 @@ describe("FileService [partial content failure]", () => {
                 sdkStatus: "INVALID_SIGNATURE",
                 transactionId: "0.0.3@5555555555.000",
                 code: HieroErrorCodes.SdkError,
+                cause: appendError,
             });
         });
     });
