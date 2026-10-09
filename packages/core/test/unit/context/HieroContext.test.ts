@@ -1,71 +1,50 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { inspect } from "node:util";
+import {
+    Client,
+    PrivateKey,
+    TransactionId,
+    TransferTransaction,
+} from "@hiero-ledger/sdk";
 import { HieroContext } from "../../../src/context/index.js";
+import type { HieroConfig } from "../../../src/config/index.js";
 import { HieroError, HieroErrorCodes } from "../../../src/errors/index.js";
 import { OperatorKeyType } from "../../../src/types/index.js";
-import type { Transaction } from "@hiero-ledger/sdk";
-import { AccountId, Client, PrivateKey } from "@hiero-ledger/sdk";
 import * as configModule from "../../../src/config/index.js";
 
-// Mock the SDK
-vi.mock("@hiero-ledger/sdk", async (importOriginal) => {
-    const actual = await importOriginal<Record<string, unknown>>();
+// Uses the real SDK: clients are built offline, and a real key is needed to
+// check that it never leaks.
 
-    const mockClient = {
-        setOperator: vi.fn().mockReturnThis(),
-        setRequestTimeout: vi.fn().mockReturnThis(),
-        setMaxAttempts: vi.fn().mockReturnThis(),
-        setMinBackoff: vi.fn().mockReturnThis(),
-        setMaxBackoff: vi.fn().mockReturnThis(),
-        close: vi.fn(),
-    };
-
-    return {
-        ...actual,
-        Client: {
-            forTestnet: vi.fn(() => mockClient),
-            forMainnet: vi.fn(() => mockClient),
-            forPreviewnet: vi.fn(() => mockClient),
-            forNetwork: vi.fn(() => ({
-                ...mockClient,
-                setMirrorNetwork: vi.fn().mockReturnThis(),
-            })),
-        },
-        AccountId: {
-            fromString: vi.fn((id: string) => ({ toString: () => id })),
-        },
-        PrivateKey: {
-            fromStringDer: vi.fn((key: string) => ({
-                toString: () => key,
-                publicKey: { toString: () => "mock-public-key-der" },
-            })),
-            fromStringED25519: vi.fn((key: string) => ({
-                toString: () => key,
-                publicKey: { toString: () => "mock-public-key-ed25519" },
-            })),
-            fromStringECDSA: vi.fn((key: string) => ({
-                toString: () => key,
-                publicKey: { toString: () => "mock-public-key-ecdsa" },
-            })),
-        },
-    };
-});
+const operatorKey =
+    "302e020100300506032b6570042204203b054ddd0c62d577ce0fbb0e92dcce0d5bea42a98a5c9663271939881ce19208";
+const privateKey = PrivateKey.fromStringDer(operatorKey);
+const ecdsaKey = PrivateKey.fromStringECDSA(
+    "7f109a9e3b0d8ecfba9cc23a3614433ce0fa7ddcc80f2a8f10b222179a5a80d6",
+);
 
 describe("HieroContext", () => {
     const validConfig = {
         network: "testnet",
         operatorId: "0.0.2",
-        operatorKey:
-            "302e020100300506032b6570042204203b054ddd0c62d577ce0fbb0e92dcce0d5bea42a98a5c9663271939881ce19208",
+        operatorKey,
         operatorKeyType: OperatorKeyType.DER,
     };
 
-    beforeEach(() => {
-        vi.clearAllMocks();
+    const contexts: HieroContext[] = [];
+    const create = (config?: HieroConfig) => {
+        const ctx = new HieroContext(config);
+        contexts.push(ctx);
+        return ctx;
+    };
+
+    afterEach(() => {
+        contexts.splice(0).forEach((ctx) => ctx.close());
+        vi.restoreAllMocks();
     });
 
     describe("Construction", () => {
         it("creates a context with valid explicit config", () => {
-            const ctx = new HieroContext(validConfig);
+            const ctx = create(validConfig);
 
             expect(ctx.config).toEqual({
                 ...validConfig,
@@ -73,17 +52,17 @@ describe("HieroContext", () => {
             });
             expect(ctx.operatorAccountId.toString()).toBe("0.0.2");
             expect(ctx.operatorPublicKey.toString()).toBe(
-                "mock-public-key-der",
+                privateKey.publicKey.toString(),
             );
-            expect(Client.forTestnet).toHaveBeenCalled();
-            expect(ctx.client.setOperator).toHaveBeenCalled();
+            expect(ctx.client.operatorAccountId?.toString()).toBe("0.0.2");
         });
 
         it("creates independent instances (no singleton)", () => {
-            const ctx1 = new HieroContext(validConfig);
-            const ctx2 = new HieroContext(validConfig);
+            const ctx1 = create(validConfig);
+            const ctx2 = create(validConfig);
 
             expect(ctx1).not.toBe(ctx2);
+            expect(ctx1.client).not.toBe(ctx2.client);
         });
 
         it("resolves from environment variables if no config provided", () => {
@@ -94,7 +73,7 @@ describe("HieroContext", () => {
                 validConfig,
             );
 
-            const ctx = new HieroContext();
+            const ctx = create();
 
             expect(ctx.config).toEqual({
                 ...validConfig,
@@ -107,13 +86,11 @@ describe("HieroContext", () => {
 
     describe("Invalid credentials", () => {
         it("throws CONFIG_INVALID for a malformed operatorId without creating a client", () => {
-            vi.mocked(AccountId.fromString).mockImplementationOnce(() => {
-                throw new Error("invalid format for entity ID");
-            });
+            const forTestnet = vi.spyOn(Client, "forTestnet");
 
             let thrown: unknown;
             try {
-                new HieroContext({ ...validConfig, operatorId: "not-an-id" });
+                create({ ...validConfig, operatorId: "not-an-id" });
             } catch (error) {
                 thrown = error;
             }
@@ -123,151 +100,133 @@ describe("HieroContext", () => {
                 code: HieroErrorCodes.ConfigInvalid,
             });
             expect((thrown as HieroError).message).toContain("not-an-id");
-            expect(Client.forTestnet).not.toHaveBeenCalled();
+            expect(forTestnet).not.toHaveBeenCalled();
         });
 
         it("does not create a client when the operator key is invalid", () => {
-            vi.mocked(PrivateKey.fromStringDer).mockImplementationOnce(() => {
-                throw new Error("invalid key");
-            });
+            const forTestnet = vi.spyOn(Client, "forTestnet");
 
-            expect(() => new HieroContext(validConfig)).toThrow(HieroError);
-            expect(Client.forTestnet).not.toHaveBeenCalled();
+            expect(() =>
+                create({ ...validConfig, operatorKey: "not-a-valid-key" }),
+            ).toThrow(/Invalid operator key/);
+            expect(forTestnet).not.toHaveBeenCalled();
         });
     });
 
     describe("Network Resolution", () => {
-        it("supports mainnet", () => {
-            new HieroContext({ ...validConfig, network: "mainnet" });
-            expect(Client.forMainnet).toHaveBeenCalled();
-        });
+        it.each([
+            ["mainnet", "mainnet"],
+            ["hedera-mainnet", "mainnet"],
+            ["testnet", "testnet"],
+            ["previewnet", "previewnet"],
+        ])("supports %s", (network, ledger) => {
+            const ctx = create({ ...validConfig, network });
 
-        it("supports hedera-mainnet alias", () => {
-            new HieroContext({ ...validConfig, network: "hedera-mainnet" });
-            expect(Client.forMainnet).toHaveBeenCalled();
-        });
-
-        it("supports previewnet", () => {
-            new HieroContext({ ...validConfig, network: "previewnet" });
-            expect(Client.forPreviewnet).toHaveBeenCalled();
+            expect(ctx.client.ledgerId?.toString()).toBe(ledger);
         });
 
         it("throws for unknown network without networkNodes", () => {
-            expect(() => {
-                new HieroContext({ ...validConfig, network: "invalid-net" });
-            }).toThrow(/Unknown network/);
+            expect(() =>
+                create({ ...validConfig, network: "invalid-net" }),
+            ).toThrow(/Unknown network/);
         });
 
-        it("supports custom network with mirrorNodeUrl", () => {
-            const ctx = new HieroContext({
+        it("supports a custom network with networkNodes", () => {
+            const ctx = create({
                 ...validConfig,
                 network: "local",
                 networkNodes: { "127.0.0.1:35211": "0.0.3" },
             });
-            expect(Client.forNetwork).toHaveBeenCalled();
-            expect(ctx).toBeDefined();
-        });
 
-        it("supports custom network with networkNodes only (no mirrorNodeUrl)", () => {
-            // Custom SDK client only needs consensus node addresses;
-            // the mirror node URL is a REST concern handled by the factory
-            // (HieroConfig deliberately has no mirrorNodeUrl key).
-            const ctx = new HieroContext({
-                ...validConfig,
-                network: "local",
-                networkNodes: { "127.0.0.1:35211": "0.0.3" },
-            });
-            expect(Client.forNetwork).toHaveBeenCalled();
-            expect(ctx).toBeDefined();
+            expect(ctx.client.network["127.0.0.1:35211"]?.toString()).toBe(
+                "0.0.3",
+            );
         });
     });
 
     describe("Closing", () => {
         it("closes the client on close()", () => {
-            const ctx = new HieroContext(validConfig);
+            const ctx = create(validConfig);
+            const close = vi.spyOn(ctx.client, "close");
+
             ctx.close();
-            expect(ctx.client.close).toHaveBeenCalled();
+
+            expect(close).toHaveBeenCalled();
         });
     });
 
-    describe("Private Key Access", () => {
-        it("exposes operatorPublicKey but not the raw key", () => {
-            const ctx = new HieroContext(validConfig);
-            expect(ctx.operatorPublicKey).toBeDefined();
-            // The private key is a #private field, not a property
-            expect(Object.keys(ctx)).not.toContain("_operatorKey");
-            expect("operatorKey" in ctx).toBe(false);
+    describe("Operator key", () => {
+        it("redacts operatorKey in config", () => {
+            const ctx = create(validConfig);
+
+            expect(ctx.config.operatorKey).toBe("[redacted]");
+            expect(JSON.stringify(ctx.config)).not.toContain(operatorKey);
         });
 
-        it("signTransaction signs with the operator key", async () => {
-            const ctx = new HieroContext(validConfig);
-            const mockTx = {
-                sign: vi.fn().mockResolvedValue("signed"),
-            } as unknown as Transaction;
-            const result = await ctx.signTransaction(mockTx);
-            expect(mockTx.sign).toHaveBeenCalled();
-            expect(result).toBe("signed");
+        it("does not modify the caller's config", () => {
+            const callerConfig = { ...validConfig };
+            const ctx = create(callerConfig);
+
+            expect(ctx.config).not.toBe(callerConfig);
+            expect(callerConfig.operatorKey).toBe(operatorKey);
+        });
+
+        it("keeps the key out of inspect output", () => {
+            const output = inspect(create(validConfig), {
+                depth: Infinity,
+                maxArrayLength: Infinity,
+            });
+
+            expect(output).not.toContain(privateKey.toStringRaw());
+            expect(output).not.toContain(
+                Array.from(privateKey.toBytesRaw()).join(", "),
+            );
+        });
+
+        it("signs transactions with the operator key", async () => {
+            const ctx = create(validConfig);
+            const tx = new TransferTransaction()
+                .setNodeAccountIds([ctx.operatorAccountId])
+                .setTransactionId(TransactionId.generate(ctx.operatorAccountId))
+                .freeze();
+
+            await ctx.signTransaction(tx);
+
+            expect(privateKey.publicKey.verifyTransaction(tx)).toBe(true);
         });
     });
 
     describe("Key Type Parsing", () => {
-        it("parses DER key via PrivateKey.fromStringDer", () => {
-            const ctx = new HieroContext({
+        it.each([
+            [OperatorKeyType.DER, operatorKey, privateKey],
+            [OperatorKeyType.ED25519, privateKey.toStringRaw(), privateKey],
+            [OperatorKeyType.ECDSA, ecdsaKey.toStringRaw(), ecdsaKey],
+        ])("parses a %s key", (operatorKeyType, key, expected) => {
+            const ctx = create({
                 ...validConfig,
-                operatorKeyType: OperatorKeyType.DER,
+                operatorKeyType,
+                operatorKey: key,
             });
-            expect(PrivateKey.fromStringDer).toHaveBeenCalledWith(
-                validConfig.operatorKey,
-            );
+
             expect(ctx.operatorPublicKey.toString()).toBe(
-                "mock-public-key-der",
+                expected.publicKey.toString(),
             );
         });
 
-        it("parses ED25519 key via PrivateKey.fromStringED25519", () => {
-            const ctx = new HieroContext({
-                ...validConfig,
-                operatorKeyType: OperatorKeyType.ED25519,
-            });
-            expect(PrivateKey.fromStringED25519).toHaveBeenCalledWith(
-                validConfig.operatorKey,
+        it("throws CONFIG_INVALID for an unknown key type", () => {
+            expect(() =>
+                create({ ...validConfig, operatorKeyType: "rsa" }),
+            ).toThrow(
+                expect.objectContaining({
+                    code: HieroErrorCodes.ConfigInvalid,
+                }),
             );
-            expect(ctx.operatorPublicKey.toString()).toBe(
-                "mock-public-key-ed25519",
-            );
-        });
-
-        it("parses ECDSA key via PrivateKey.fromStringECDSA", () => {
-            const ctx = new HieroContext({
-                ...validConfig,
-                operatorKeyType: OperatorKeyType.ECDSA,
-            });
-            expect(PrivateKey.fromStringECDSA).toHaveBeenCalledWith(
-                validConfig.operatorKey,
-            );
-            expect(ctx.operatorPublicKey.toString()).toBe(
-                "mock-public-key-ecdsa",
-            );
-        });
-
-        it("throws with a helpful message on invalid key material", () => {
-            vi.mocked(PrivateKey.fromStringDer).mockImplementationOnce(() => {
-                throw new Error("bad key");
-            });
-            expect(
-                () =>
-                    new HieroContext({
-                        ...validConfig,
-                        operatorKeyType: OperatorKeyType.DER,
-                        operatorKey: "not-a-valid-key",
-                    }),
-            ).toThrow(/Invalid operator key/);
         });
     });
 
     describe("Transaction Listeners", () => {
         it("registers and removes transaction listeners", async () => {
-            const ctx = new HieroContext(validConfig);
+            const ctx = create(validConfig);
             const mockListener = {
                 onBeforeTransaction: vi.fn(),
                 onAfterTransaction: vi.fn(),
@@ -308,104 +267,93 @@ describe("HieroContext", () => {
             const emitWarning = vi
                 .spyOn(process, "emitWarning")
                 .mockImplementation(() => undefined);
-            try {
-                const ctx = new HieroContext(validConfig);
-                const later = { onAfterTransaction: vi.fn() };
-                ctx.addTransactionListener({
-                    onAfterTransaction: () => {
-                        throw new Error("sync listener bug");
-                    },
-                });
-                ctx.addTransactionListener({
-                    onAfterTransaction: () =>
-                        Promise.reject(new Error("async listener bug")),
-                });
-                ctx.addTransactionListener(later);
+            const ctx = create(validConfig);
+            const later = { onAfterTransaction: vi.fn() };
+            ctx.addTransactionListener({
+                onAfterTransaction: () => {
+                    throw new Error("sync listener bug");
+                },
+            });
+            ctx.addTransactionListener({
+                onAfterTransaction: () =>
+                    Promise.reject(new Error("async listener bug")),
+            });
+            ctx.addTransactionListener(later);
 
-                await expect(
-                    ctx.emitAfterTransaction(event),
-                ).resolves.toBeUndefined();
+            await expect(
+                ctx.emitAfterTransaction(event),
+            ).resolves.toBeUndefined();
 
-                expect(later.onAfterTransaction).toHaveBeenCalledWith(event);
-                expect(emitWarning).toHaveBeenCalledTimes(2);
-                expect(emitWarning).toHaveBeenCalledWith(
-                    expect.stringContaining(
-                        "AccountService.createAccount: sync listener bug",
-                    ),
-                    expect.objectContaining({ code: "HIERO_LISTENER_ERROR" }),
-                );
-            } finally {
-                emitWarning.mockRestore();
-            }
+            expect(later.onAfterTransaction).toHaveBeenCalledWith(event);
+            expect(emitWarning).toHaveBeenCalledTimes(2);
+            expect(emitWarning).toHaveBeenCalledWith(
+                expect.stringContaining(
+                    "AccountService.createAccount: sync listener bug",
+                ),
+                expect.objectContaining({ code: "HIERO_LISTENER_ERROR" }),
+            );
         });
 
         it("still runs later listeners when a listener throws an unprintable value", async () => {
             const emitWarning = vi
                 .spyOn(process, "emitWarning")
                 .mockImplementation(() => undefined);
-            try {
-                const ctx = new HieroContext(validConfig);
-                const later = { onAfterTransaction: vi.fn() };
-                ctx.addTransactionListener({
-                    onAfterTransaction: () => {
-                        throw Object.create(null);
-                    },
-                });
-                ctx.addTransactionListener(later);
+            const ctx = create(validConfig);
+            const later = { onAfterTransaction: vi.fn() };
+            ctx.addTransactionListener({
+                onAfterTransaction: () => {
+                    throw Object.create(null);
+                },
+            });
+            ctx.addTransactionListener(later);
 
-                await expect(
-                    ctx.emitAfterTransaction(event),
-                ).resolves.toBeUndefined();
-                expect(later.onAfterTransaction).toHaveBeenCalledWith(event);
-                expect(emitWarning).toHaveBeenCalledTimes(1);
-            } finally {
-                emitWarning.mockRestore();
-            }
+            await expect(
+                ctx.emitAfterTransaction(event),
+            ).resolves.toBeUndefined();
+            expect(later.onAfterTransaction).toHaveBeenCalledWith(event);
+            expect(emitWarning).toHaveBeenCalledTimes(1);
         });
 
         it("isolates throwing onBeforeTransaction listeners and still notifies the rest", async () => {
             const emitWarning = vi
                 .spyOn(process, "emitWarning")
                 .mockImplementation(() => undefined);
-            try {
-                const ctx = new HieroContext(validConfig);
-                const later = { onBeforeTransaction: vi.fn() };
-                ctx.addTransactionListener({
-                    onBeforeTransaction: () => {
-                        throw new Error("metrics backend down");
-                    },
-                });
-                ctx.addTransactionListener(later);
+            const ctx = create(validConfig);
+            const later = { onBeforeTransaction: vi.fn() };
+            ctx.addTransactionListener({
+                onBeforeTransaction: () => {
+                    throw new Error("metrics backend down");
+                },
+            });
+            ctx.addTransactionListener(later);
 
-                await expect(
-                    ctx.emitBeforeTransaction(event),
-                ).resolves.toBeUndefined();
-                expect(later.onBeforeTransaction).toHaveBeenCalledWith(event);
-                expect(emitWarning).toHaveBeenCalledWith(
-                    expect.stringContaining(
-                        "onBeforeTransaction listener threw for AccountService.createAccount: metrics backend down",
-                    ),
-                    expect.objectContaining({ code: "HIERO_LISTENER_ERROR" }),
-                );
-            } finally {
-                emitWarning.mockRestore();
-            }
+            await expect(
+                ctx.emitBeforeTransaction(event),
+            ).resolves.toBeUndefined();
+            expect(later.onBeforeTransaction).toHaveBeenCalledWith(event);
+            expect(emitWarning).toHaveBeenCalledWith(
+                expect.stringContaining(
+                    "onBeforeTransaction listener threw for AccountService.createAccount: metrics backend down",
+                ),
+                expect.objectContaining({ code: "HIERO_LISTENER_ERROR" }),
+            );
         });
     });
 
     describe("SDK Tuning", () => {
         it("applies tuning options from config", () => {
-            const ctx = new HieroContext({
+            const ctx = create({
                 ...validConfig,
                 requestTimeoutMs: 30000,
                 maxAttempts: 5,
                 minBackoffMs: 500,
                 maxBackoffMs: 8000,
             });
-            expect(ctx.client.setRequestTimeout).toHaveBeenCalledWith(30000);
-            expect(ctx.client.setMaxAttempts).toHaveBeenCalledWith(5);
-            expect(ctx.client.setMinBackoff).toHaveBeenCalledWith(500);
-            expect(ctx.client.setMaxBackoff).toHaveBeenCalledWith(8000);
+
+            expect(ctx.client.requestTimeout).toBe(30000);
+            expect(ctx.client.maxAttempts).toBe(5);
+            expect(ctx.client.minBackoff).toBe(500);
+            expect(ctx.client.maxBackoff).toBe(8000);
         });
     });
 });
