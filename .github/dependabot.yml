@@ -28,6 +28,10 @@ updates:
           # toolchain supports it.
           - dependency-name: "typescript"
             update-types: ["version-update:semver-major"]
+          # Core's BigNumber types must match the copy @hiero-ledger/sdk
+          # pins, or the two copies fail to type-check against each other
+          # (#281). Bump it by hand with the SDK.
+          - dependency-name: "bignumber.js"
       groups:
           dependencies:
               patterns:
