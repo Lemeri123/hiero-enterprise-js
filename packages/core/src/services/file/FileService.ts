@@ -184,10 +184,10 @@ export class FileService {
             } catch (error) {
                 throw wrapAppendFailure(
                     error,
+                    `File ${result.fileId} was created, but appending the remainder of its contents failed`,
                     result.fileId,
                     result.transactionId,
                     "FileService.createFile",
-                    "was created",
                 );
             }
         }
@@ -259,10 +259,10 @@ export class FileService {
             } catch (error) {
                 throw wrapAppendFailure(
                     error,
+                    `File ${options.fileId} was updated, but appending the remainder of its contents failed, so the file holds partial contents`,
                     options.fileId,
                     result.transactionId,
                     "FileService.updateFile",
-                    "was updated",
                 );
             }
         }
@@ -396,38 +396,24 @@ function splitContents(
 }
 
 /**
- * Wrap an append failure into a HieroError that carries the fileId and
- * makes clear that the initial create/update succeeded but subsequent
- * append failed, leaving the file with partial contents.
- *
- * @param error - The raw append error
- * @param fileId - The file entity ID
- * @param transactionId - Transaction ID from the create/update that succeeded
- * @param context - Operation context (e.g., "FileService.createFile")
- * @param actionVerb - Past tense action verb (e.g., "was created", "was updated")
- * @returns A HieroError with fileId attached
+ * Wrap an append that failed after the create/update landed. The error
+ * carries the file ID and the landed transaction's ID; the append's error
+ * stays on `cause`.
  */
 function wrapAppendFailure(
     error: unknown,
+    message: string,
     fileId: FileId | string,
-    transactionId: string,
+    transactionId: string | undefined,
     context: string,
-    actionVerb: string,
 ): HieroError {
-    const normalized = normalizeError(error, context);
-    const fileIdStr = typeof fileId === "string" ? fileId : fileId.toString();
-
-    const isUpdate = context === "FileService.updateFile";
-    const partialMessage = isUpdate
-        ? `File ${fileIdStr} ${actionVerb}, but appending the remainder of its contents failed, so the file holds partial contents: ${normalized.message}`
-        : `File ${fileIdStr} ${actionVerb}, but appending the remainder of its contents failed: ${normalized.message}`;
-
-    return new HieroError(partialMessage, {
-        code: normalized.code,
-        sdkStatus: normalized.sdkStatus,
+    const cause = normalizeError(error, context);
+    return new HieroError(`${message}: ${cause.message}`, {
+        code: cause.code,
+        sdkStatus: cause.sdkStatus,
         context,
-        cause: normalized.cause ?? normalized,
+        cause,
         transactionId,
-        fileId: fileIdStr,
+        fileId: fileId.toString(),
     });
 }
