@@ -287,7 +287,7 @@ Both packages are versioned **in lockstep**: one version number, one tag. The wo
 2. Choose the new version (pre-1.0: minor `0.x.0` for features, patch `0.0.x` for fixes) and bump the root **and** every publishable package to it, in lockstep:
    ```bash
    NEW=0.3.0
-   pnpm --filter "./packages/*" exec npm pkg set version="$NEW"  # the 5 published packages
+   pnpm --filter "./packages/*" exec npm pkg set version="$NEW"  # the published packages
    npm pkg set version="$NEW"                                    # repo root
    ```
    (The private `samples/*` are never published, so leave them alone.)
