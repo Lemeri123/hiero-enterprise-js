@@ -1,4 +1,4 @@
-import type { FileId, Key } from "@hiero-ledger/sdk";
+import type { FileId } from "@hiero-ledger/sdk";
 import type { IHieroContext } from "../../context/index.js";
 import {
     HieroError,
@@ -157,7 +157,7 @@ export class FileService {
      */
     async createFile(options: CreateFileOptions = {}) {
         const [head, tail] = splitContents(options.contents);
-        const keys = options.keys ?? [this.context.operatorPublicKey as Key];
+        const keys = options.keys ?? [this.context.operatorPublicKey];
 
         const result = await this.createOperation.execute({
             ...options,
