@@ -68,9 +68,6 @@ describe("HieroContext", () => {
         });
 
         it("resolves from environment variables if no config provided", () => {
-            vi.spyOn(configModule, "assertEnvConfigValid").mockImplementation(
-                () => {},
-            );
             vi.spyOn(configModule, "resolveConfigFromEnv").mockReturnValue(
                 validConfig,
             );
@@ -81,8 +78,20 @@ describe("HieroContext", () => {
                 ...validConfig,
                 operatorKey: "[redacted]",
             });
-            expect(configModule.assertEnvConfigValid).toHaveBeenCalled();
             expect(configModule.resolveConfigFromEnv).toHaveBeenCalled();
+        });
+
+        it("throws CONFIG_INVALID from resolveConfigFromEnv when env is invalid", () => {
+            vi.spyOn(configModule, "resolveConfigFromEnv").mockImplementation(
+                () => {
+                    throw new HieroError("Invalid config", {
+                        code: HieroErrorCodes.ConfigInvalid,
+                    });
+                },
+            );
+
+            expect(() => create()).toThrow(HieroError);
+            expect(() => create()).toThrow(/Invalid config/);
         });
     });
 

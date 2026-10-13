@@ -8,7 +8,7 @@ import {
     HttpRequest,
 } from "@hiero-ledger/sdk";
 import type { HieroConfig } from "../config/index.js";
-import { resolveConfigFromEnv, assertEnvConfigValid } from "../config/index.js";
+import { resolveConfigFromEnv } from "../config/index.js";
 import { OperatorKeyType } from "../types/index.js";
 import type {
     TransactionListener,
@@ -115,10 +115,8 @@ export class HieroContext implements IHieroContext {
     private mirrorNodeTransport?: HttpTransport;
 
     constructor(config?: HieroConfig) {
-        if (!config) {
-            assertEnvConfigValid();
-        }
-        const resolved = config ?? resolveConfigFromEnv()!;
+        // resolveConfigFromEnv() now throws CONFIG_INVALID instead of returning null
+        const resolved = config ?? resolveConfigFromEnv();
         this.config = { ...resolved, operatorKey: "[redacted]" };
 
         // Parse credentials before creating the client, so invalid config

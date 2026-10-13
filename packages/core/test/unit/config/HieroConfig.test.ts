@@ -1,13 +1,32 @@
 import { describe, it, expect } from "vitest";
-import { resolveConfigFromEnv } from "../../../src/config/index.js";
+import {
+    resolveConfigFromEnv,
+    assertEnvConfigValid,
+} from "../../../src/config/index.js";
 import { OperatorKeyType } from "../../../src/types/index.js";
+import { HieroError, HieroErrorCodes } from "../../../src/errors/index.js";
 
 describe("resolveConfigFromEnv", () => {
     const env = process.env;
 
-    it("returns null when env vars are missing", () => {
+    it("throws when env vars are missing", () => {
         process.env = {};
-        expect(resolveConfigFromEnv()).toBeNull();
+        expect(() => resolveConfigFromEnv()).toThrow(HieroError);
+        expect(() => resolveConfigFromEnv()).toThrow(/Missing required/);
+        process.env = env;
+    });
+
+    it("throws with CONFIG_INVALID when env vars are missing", () => {
+        process.env = {};
+        try {
+            resolveConfigFromEnv();
+            expect.fail("Should have thrown");
+        } catch (error) {
+            expect(error).toBeInstanceOf(HieroError);
+            expect((error as HieroError).code).toBe(
+                HieroErrorCodes.ConfigInvalid,
+            );
+        }
         process.env = env;
     });
 
@@ -28,13 +47,39 @@ describe("resolveConfigFromEnv", () => {
         process.env = env;
     });
 
-    it("returns null when operatorKeyType is missing", () => {
+    it("throws when operatorKeyType is missing", () => {
         process.env = {
             HIERO_NETWORK: "testnet",
             HIERO_OPERATOR_ID: "0.0.1",
             HIERO_OPERATOR_KEY: "key123",
         };
-        expect(resolveConfigFromEnv()).toBeNull();
+        expect(() => resolveConfigFromEnv()).toThrow(HieroError);
+        expect(() => resolveConfigFromEnv()).toThrow(
+            /HIERO_OPERATOR_KEY_TYPE/,
+        );
+        process.env = env;
+    });
+
+    it("throws CONFIG_INVALID for invalid operatorKeyType", () => {
+        process.env = {
+            HIERO_NETWORK: "testnet",
+            HIERO_OPERATOR_ID: "0.0.2",
+            HIERO_OPERATOR_KEY: "abc",
+            HIERO_OPERATOR_KEY_TYPE: "rsa",
+        };
+        try {
+            resolveConfigFromEnv();
+            expect.fail("Should have thrown");
+        } catch (error) {
+            expect(error).toBeInstanceOf(HieroError);
+            expect((error as HieroError).code).toBe(
+                HieroErrorCodes.ConfigInvalid,
+            );
+            expect((error as HieroError).message).toContain("rsa");
+            expect((error as HieroError).message).toMatch(
+                /ed25519.*ecdsa.*der/,
+            );
+        }
         process.env = env;
     });
 
@@ -50,6 +95,50 @@ describe("resolveConfigFromEnv", () => {
             "127.0.0.1:50211": "0.0.3",
             "127.0.0.1:50212": "0.0.4",
         });
+        process.env = env;
+    });
+
+    it("throws CONFIG_INVALID for malformed HIERO_NETWORK_NODES entries", () => {
+        process.env = {
+            HIERO_NETWORK: "local",
+            HIERO_OPERATOR_ID: "0.0.1",
+            HIERO_OPERATOR_KEY: "key123",
+            HIERO_OPERATOR_KEY_TYPE: "ed25519",
+            HIERO_NETWORK_NODES: "127.0.0.1:50211,127.0.0.1:50212=0.0.4",
+        };
+        try {
+            resolveConfigFromEnv();
+            expect.fail("Should have thrown");
+        } catch (error) {
+            expect(error).toBeInstanceOf(HieroError);
+            expect((error as HieroError).code).toBe(
+                HieroErrorCodes.ConfigInvalid,
+            );
+            expect((error as HieroError).message).toContain("127.0.0.1:50211");
+            expect((error as HieroError).message).toContain('missing "="');
+        }
+        process.env = env;
+    });
+
+    it("throws CONFIG_INVALID when all HIERO_NETWORK_NODES entries are malformed", () => {
+        process.env = {
+            HIERO_NETWORK: "local",
+            HIERO_OPERATOR_ID: "0.0.1",
+            HIERO_OPERATOR_KEY: "key123",
+            HIERO_OPERATOR_KEY_TYPE: "ed25519",
+            HIERO_NETWORK_NODES: "127.0.0.1:50211,127.0.0.1:50212",
+        };
+        try {
+            resolveConfigFromEnv();
+            expect.fail("Should have thrown");
+        } catch (error) {
+            expect(error).toBeInstanceOf(HieroError);
+            expect((error as HieroError).code).toBe(
+                HieroErrorCodes.ConfigInvalid,
+            );
+            expect((error as HieroError).message).toContain("127.0.0.1:50211");
+            expect((error as HieroError).message).toContain("127.0.0.1:50212");
+        }
         process.env = env;
     });
 
@@ -81,6 +170,46 @@ describe("resolveConfigFromEnv", () => {
         const config = resolveConfigFromEnv();
         expect(config?.mirrorNetwork).toBeUndefined();
         expect(config?.mirrorNodeUrl).toBeUndefined();
+        process.env = env;
+    });
+});
+
+describe("assertEnvConfigValid", () => {
+    const env = process.env;
+
+    it("throws when env vars are missing", () => {
+        process.env = {};
+        expect(() => assertEnvConfigValid()).toThrow(HieroError);
+        process.env = env;
+    });
+
+    it("throws CONFIG_INVALID for invalid operatorKeyType", () => {
+        process.env = {
+            HIERO_NETWORK: "testnet",
+            HIERO_OPERATOR_ID: "0.0.2",
+            HIERO_OPERATOR_KEY: "abc",
+            HIERO_OPERATOR_KEY_TYPE: "rsa",
+        };
+        try {
+            assertEnvConfigValid();
+            expect.fail("Should have thrown");
+        } catch (error) {
+            expect(error).toBeInstanceOf(HieroError);
+            expect((error as HieroError).code).toBe(
+                HieroErrorCodes.ConfigInvalid,
+            );
+        }
+        process.env = env;
+    });
+
+    it("does not throw when env is valid", () => {
+        process.env = {
+            HIERO_NETWORK: "testnet",
+            HIERO_OPERATOR_ID: "0.0.1",
+            HIERO_OPERATOR_KEY: "key123",
+            HIERO_OPERATOR_KEY_TYPE: "ed25519",
+        };
+        expect(() => assertEnvConfigValid()).not.toThrow();
         process.env = env;
     });
 });

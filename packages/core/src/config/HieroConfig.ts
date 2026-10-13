@@ -57,65 +57,18 @@ export interface HieroConfig {
  *   HIERO_MIRROR_NETWORK
  *   HIERO_MIRROR_NODE_URL
  *
- * @returns A HieroConfig or null if required env vars are missing
+ * @returns A HieroConfig
+ * @throws HieroError with code CONFIG_INVALID if required env vars are missing or have invalid values
  */
-export function resolveConfigFromEnv(): HieroConfig | null {
+export function resolveConfigFromEnv(): HieroConfig {
     const network = process.env["HIERO_NETWORK"];
     const operatorId = process.env["HIERO_OPERATOR_ID"];
     const operatorKey = process.env["HIERO_OPERATOR_KEY"];
     const operatorKeyTypeRaw =
         process.env["HIERO_OPERATOR_KEY_TYPE"]?.toLowerCase();
-    const operatorKeyType =
-        operatorKeyTypeRaw === "ed25519" ||
-        operatorKeyTypeRaw === "ecdsa" ||
-        operatorKeyTypeRaw === "der"
-            ? operatorKeyTypeRaw
-            : undefined;
     const networkNodesRaw = process.env["HIERO_NETWORK_NODES"];
 
-    if (!network || !operatorId || !operatorKey || !operatorKeyType) {
-        return null;
-    }
-
-    // Parse HIERO_NETWORK_NODES: "host:port=accountId,host:port=accountId"
-    let networkNodes: Record<string, string> | undefined;
-    if (networkNodesRaw) {
-        const parsed = new Map<string, string>();
-        for (const entry of networkNodesRaw.split(",")) {
-            const [address, accountId] = entry.trim().split("=");
-            if (address && accountId) {
-                parsed.set(address, accountId);
-            }
-        }
-        networkNodes = Object.fromEntries(parsed);
-    }
-
-    // Parse HIERO_MIRROR_NETWORK: "host:port,host:port"
-    const mirrorNetwork = process.env["HIERO_MIRROR_NETWORK"]
-        ?.split(",")
-        .map((address) => address.trim())
-        .filter((address) => address.length > 0);
-
-    return {
-        network,
-        operatorId,
-        operatorKey,
-        operatorKeyType,
-        networkNodes,
-        mirrorNetwork: mirrorNetwork?.length ? mirrorNetwork : undefined,
-        mirrorNodeUrl: process.env["HIERO_MIRROR_NODE_URL"] || undefined,
-    };
-}
-
-/**
- * Validates the environment and throws a HieroError explaining exactly what is missing.
- */
-export function assertEnvConfigValid(): void {
-    const network = process.env["HIERO_NETWORK"];
-    const operatorId = process.env["HIERO_OPERATOR_ID"];
-    const operatorKey = process.env["HIERO_OPERATOR_KEY"];
-    const operatorKeyType = process.env["HIERO_OPERATOR_KEY_TYPE"];
-
+    // Check for missing required variables
     const missing = [];
     if (!network)
         missing.push(
@@ -123,7 +76,7 @@ export function assertEnvConfigValid(): void {
         );
     if (!operatorId) missing.push("HIERO_OPERATOR_ID (e.g., '0.0.12345')");
     if (!operatorKey) missing.push("HIERO_OPERATOR_KEY (your private key)");
-    if (!operatorKeyType)
+    if (!operatorKeyTypeRaw)
         missing.push(
             "HIERO_OPERATOR_KEY_TYPE (one of: 'ed25519', 'ecdsa', 'der')",
         );
@@ -135,4 +88,63 @@ export function assertEnvConfigValid(): void {
             { code: HieroErrorCodes.ConfigInvalid },
         );
     }
+
+    // Validate operatorKeyType value
+    const validKeyTypes = ["ed25519", "ecdsa", "der"];
+    if (!validKeyTypes.includes(operatorKeyTypeRaw!)) {
+        throw new HieroError(
+            `Invalid HIERO_OPERATOR_KEY_TYPE "${operatorKeyTypeRaw}". Must be one of: ${validKeyTypes.map((t) => `"${t}"`).join(", ")}.`,
+            { code: HieroErrorCodes.ConfigInvalid },
+        );
+    }
+
+    // Parse HIERO_NETWORK_NODES: "host:port=accountId,host:port=accountId"
+    let networkNodes: Record<string, string> | undefined;
+    if (networkNodesRaw) {
+        const parsed = new Map<string, string>();
+        const malformed: string[] = [];
+        for (const entry of networkNodesRaw.split(",")) {
+            const trimmed = entry.trim();
+            if (!trimmed) continue; // Skip empty entries
+            const [address, accountId] = trimmed.split("=");
+            if (address && accountId) {
+                parsed.set(address, accountId);
+            } else {
+                malformed.push(trimmed);
+            }
+        }
+        if (malformed.length > 0) {
+            throw new HieroError(
+                `Malformed HIERO_NETWORK_NODES entries (missing "="): ${malformed.map((e) => `"${e}"`).join(", ")}. ` +
+                    `Expected format: "host:port=accountId,host:port=accountId".`,
+                { code: HieroErrorCodes.ConfigInvalid },
+            );
+        }
+        networkNodes = Object.fromEntries(parsed);
+    }
+
+    // Parse HIERO_MIRROR_NETWORK: "host:port,host:port"
+    const mirrorNetwork = process.env["HIERO_MIRROR_NETWORK"]
+        ?.split(",")
+        .map((address) => address.trim())
+        .filter((address) => address.length > 0);
+
+    return {
+        network: network!,
+        operatorId: operatorId!,
+        operatorKey: operatorKey!,
+        operatorKeyType: operatorKeyTypeRaw!,
+        networkNodes,
+        mirrorNetwork: mirrorNetwork?.length ? mirrorNetwork : undefined,
+        mirrorNodeUrl: process.env["HIERO_MIRROR_NODE_URL"] || undefined,
+    };
+}
+
+/**
+ * Validates the environment and throws a HieroError explaining exactly what is missing or invalid.
+ * This is a wrapper around resolveConfigFromEnv() that discards the config.
+ */
+export function assertEnvConfigValid(): void {
+    // Just call resolveConfigFromEnv() to validate - it now throws on invalid config
+    resolveConfigFromEnv();
 }
