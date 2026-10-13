@@ -54,9 +54,7 @@ describe("resolveConfigFromEnv", () => {
             HIERO_OPERATOR_KEY: "key123",
         };
         expect(() => resolveConfigFromEnv()).toThrow(HieroError);
-        expect(() => resolveConfigFromEnv()).toThrow(
-            /HIERO_OPERATOR_KEY_TYPE/,
-        );
+        expect(() => resolveConfigFromEnv()).toThrow(/HIERO_OPERATOR_KEY_TYPE/);
         process.env = env;
     });
 
