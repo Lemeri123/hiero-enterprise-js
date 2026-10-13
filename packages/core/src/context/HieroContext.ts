@@ -118,7 +118,13 @@ export class HieroContext implements IHieroContext {
         if (!config) {
             assertEnvConfigValid();
         }
-        const resolved = config ?? resolveConfigFromEnv()!;
+        const resolved = config ?? resolveConfigFromEnv();
+        if (!resolved) {
+            throw new HieroError(
+                "Configuration could not be resolved from environment variables.",
+                { code: HieroErrorCodes.ConfigInvalid },
+            );
+        }
         this.config = { ...resolved, operatorKey: "[redacted]" };
 
         // Parse credentials before creating the client, so invalid config

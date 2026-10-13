@@ -57,36 +57,63 @@ export interface HieroConfig {
  *   HIERO_MIRROR_NETWORK
  *   HIERO_MIRROR_NODE_URL
  *
- * @returns A HieroConfig or null if required env vars are missing
+ * @returns A HieroConfig, or null if required env vars are missing
+ * @throws HieroError with CONFIG_INVALID if values are invalid
  */
 export function resolveConfigFromEnv(): HieroConfig | null {
     const network = process.env["HIERO_NETWORK"];
     const operatorId = process.env["HIERO_OPERATOR_ID"];
     const operatorKey = process.env["HIERO_OPERATOR_KEY"];
-    const operatorKeyTypeRaw =
-        process.env["HIERO_OPERATOR_KEY_TYPE"]?.toLowerCase();
-    const operatorKeyType =
-        operatorKeyTypeRaw === "ed25519" ||
-        operatorKeyTypeRaw === "ecdsa" ||
-        operatorKeyTypeRaw === "der"
-            ? operatorKeyTypeRaw
-            : undefined;
+    const operatorKeyTypeRaw = process.env["HIERO_OPERATOR_KEY_TYPE"];
     const networkNodesRaw = process.env["HIERO_NETWORK_NODES"];
 
-    if (!network || !operatorId || !operatorKey || !operatorKeyType) {
+    if (!network || !operatorId || !operatorKey || !operatorKeyTypeRaw) {
         return null;
+    }
+
+    // Validate and normalize operatorKeyType
+    const normalizedKeyType = operatorKeyTypeRaw.toLowerCase();
+    if (
+        normalizedKeyType !== "ed25519" &&
+        normalizedKeyType !== "ecdsa" &&
+        normalizedKeyType !== "der"
+    ) {
+        throw new HieroError(
+            `Invalid HIERO_OPERATOR_KEY_TYPE: "${operatorKeyTypeRaw}". Must be one of: "ed25519", "ecdsa", "der".`,
+            { code: HieroErrorCodes.ConfigInvalid },
+        );
     }
 
     // Parse HIERO_NETWORK_NODES: "host:port=accountId,host:port=accountId"
     let networkNodes: Record<string, string> | undefined;
     if (networkNodesRaw) {
         const parsed = new Map<string, string>();
-        for (const entry of networkNodesRaw.split(",")) {
-            const [address, accountId] = entry.trim().split("=");
+        const entries = networkNodesRaw.split(",");
+        const malformed: string[] = [];
+
+        for (const entry of entries) {
+            const trimmed = entry.trim();
+            if (!trimmed) continue;
+
+            if (!trimmed.includes("=")) {
+                malformed.push(trimmed);
+                continue;
+            }
+
+            const [address, accountId] = trimmed.split("=");
             if (address && accountId) {
                 parsed.set(address, accountId);
             }
         }
+
+        if (malformed.length > 0) {
+            throw new HieroError(
+                `Invalid HIERO_NETWORK_NODES format. Each entry must be "host:port=accountId".\n` +
+                    `Malformed entries: ${malformed.join(", ")}`,
+                { code: HieroErrorCodes.ConfigInvalid },
+            );
+        }
+
         networkNodes = Object.fromEntries(parsed);
     }
 
@@ -100,7 +127,7 @@ export function resolveConfigFromEnv(): HieroConfig | null {
         network,
         operatorId,
         operatorKey,
-        operatorKeyType,
+        operatorKeyType: normalizedKeyType,
         networkNodes,
         mirrorNetwork: mirrorNetwork?.length ? mirrorNetwork : undefined,
         mirrorNodeUrl: process.env["HIERO_MIRROR_NODE_URL"] || undefined,
@@ -108,13 +135,14 @@ export function resolveConfigFromEnv(): HieroConfig | null {
 }
 
 /**
- * Validates the environment and throws a HieroError explaining exactly what is missing.
+ * Validates the environment and throws a HieroError explaining exactly what is missing or invalid.
  */
 export function assertEnvConfigValid(): void {
     const network = process.env["HIERO_NETWORK"];
     const operatorId = process.env["HIERO_OPERATOR_ID"];
     const operatorKey = process.env["HIERO_OPERATOR_KEY"];
     const operatorKeyType = process.env["HIERO_OPERATOR_KEY_TYPE"];
+    const networkNodesRaw = process.env["HIERO_NETWORK_NODES"];
 
     const missing = [];
     if (!network)
@@ -134,5 +162,38 @@ export function assertEnvConfigValid(): void {
                 `Set them in your process environment before application startup.`,
             { code: HieroErrorCodes.ConfigInvalid },
         );
+    }
+
+    // Validate operatorKeyType value (guaranteed to be set by the checks above)
+    const normalizedKeyType = operatorKeyType!.toLowerCase();
+    if (
+        normalizedKeyType !== "ed25519" &&
+        normalizedKeyType !== "ecdsa" &&
+        normalizedKeyType !== "der"
+    ) {
+        throw new HieroError(
+            `Invalid HIERO_OPERATOR_KEY_TYPE: "${operatorKeyType}". Must be one of: "ed25519", "ecdsa", "der".`,
+            { code: HieroErrorCodes.ConfigInvalid },
+        );
+    }
+
+    // Validate networkNodes format if provided
+    if (networkNodesRaw) {
+        const entries = networkNodesRaw.split(",");
+        const malformed: string[] = [];
+        for (const entry of entries) {
+            const trimmed = entry.trim();
+            if (!trimmed) continue;
+            if (!trimmed.includes("=")) {
+                malformed.push(trimmed);
+            }
+        }
+        if (malformed.length > 0) {
+            throw new HieroError(
+                `Invalid HIERO_NETWORK_NODES format. Each entry must be "host:port=accountId".\n` +
+                    `Malformed entries: ${malformed.join(", ")}`,
+                { code: HieroErrorCodes.ConfigInvalid },
+            );
+        }
     }
 }
