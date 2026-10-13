@@ -313,9 +313,11 @@ describe("TopicMessageQuery (via TopicService)", () => {
             );
 
             const sdkQuery = sentQuery();
-            // The SDK reads a number as epoch seconds.
-            expect(sdkQuery.startTime?.seconds.toNumber()).toBe(1700000000000);
-            expect(sdkQuery.endTime?.seconds.toNumber()).toBe(1800000000000);
+            // Numbers are epoch milliseconds.
+            expect(sdkQuery.startTime?.toDate()).toEqual(
+                new Date(1700000000000),
+            );
+            expect(sdkQuery.endTime?.toDate()).toEqual(new Date(1800000000000));
             expect(sdkQuery.limit?.toNumber()).toBe(10);
             expect(sdkQuery._maxAttempts).toBe(4);
             expect(sdkQuery._maxBackoff).toBe(16000);

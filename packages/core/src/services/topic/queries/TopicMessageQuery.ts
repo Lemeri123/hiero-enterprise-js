@@ -43,15 +43,14 @@ export interface TopicMessageSubscribeOptions {
     /** Topic to subscribe to (required). */
     topicId: TopicId | string;
     /**
-     * Earliest consensus timestamp to deliver. Pass a `Date`, an epoch
-     * milliseconds number, or a `Timestamp`. Omit to start from the
-     * topic's first message (`0.0`).
+     * Earliest consensus timestamp to deliver, as a `Date` or epoch
+     * milliseconds. Omit to start from the topic's first message (`0.0`).
      */
     startTime?: Date | number;
     /**
      * Stop delivering messages with consensus timestamps at or after
-     * this point and end the subscription. Omit for an open-ended
-     * subscription.
+     * this point and end the subscription, as a `Date` or epoch
+     * milliseconds. Omit for an open-ended subscription.
      */
     endTime?: Date | number;
     /**
@@ -160,11 +159,12 @@ export class TopicMessageQuery {
     private build(options: TopicMessageSubscribeOptions): SdkTopicMessageQuery {
         const query = new SdkTopicMessageQuery().setTopicId(options.topicId);
 
+        // The SDK reads a number as epoch seconds; ours are milliseconds.
         if (options.startTime != null) {
-            query.setStartTime(options.startTime);
+            query.setStartTime(new Date(options.startTime));
         }
         if (options.endTime != null) {
-            query.setEndTime(options.endTime);
+            query.setEndTime(new Date(options.endTime));
         }
         if (options.limit != null) {
             query.setLimit(options.limit);

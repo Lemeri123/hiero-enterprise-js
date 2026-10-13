@@ -1,285 +1,235 @@
 # @hiero-hackers/enterprise-mirror
 
-Dependency-free client for the Hiero mirror node REST API — typed
-repositories, continuable pagination, pro-active rate limiting, rich query
-filters, and unit helpers.
+A typed client for the Hiero mirror node REST API, with no dependencies.
 
-Mirror node reads are free and keyless: no SDK, no operator credentials, no
-gRPC. This package's only runtime requirement is global `fetch` (Node 18+).
-If you also submit transactions, pair it with `@hiero-hackers/enterprise-core` or a
-framework adapter.
+Mirror node reads are free and need no keys, so this package has no SDK, no credentials and no gRPC. It only needs a global `fetch` (Node.js 18+). It covers the whole REST API with typed repositories, and adds pagination, client-side rate limiting, filters and unit helpers. To send transactions as well, add [`@hiero-hackers/enterprise-core`](../core).
 
-```bash
+## Install
+
+```sh
 npm install @hiero-hackers/enterprise-mirror
 ```
 
-> **Note:** published to the GitHub Packages registry (not npmjs.org) — add
-> `@hiero-hackers:registry=https://npm.pkg.github.com/` and a `read:packages`
-> token to your `.npmrc` first; see
-> [CONTRIBUTING § Installing the published packages](../../CONTRIBUTING.md#installing-the-published-packages).
+## Usage
 
 ```ts
 import {
-    MirrorNodeClient,
-    TransactionRepository,
-    collectAll,
+  MirrorNodeClient,
+  TransactionRepository,
 } from "@hiero-hackers/enterprise-mirror";
 
 const mirror = new MirrorNodeClient("https://mainnet.mirrornode.hedera.com", {
-    maxConcurrent: 25,
-    maxRequestsPerSecond: 50, // stay under 50 TPS
+  maxConcurrent: 25,
+  maxRequestsPerSecond: 50,
 });
 const transactions = new TransactionRepository(mirror);
 
 const recent = await transactions.findByAccount("0.0.98", {
-    limit: 10,
-    order: "desc",
+  limit: 10,
+  order: "desc",
 });
 ```
 
-Or resolve everything from environment variables:
+Or read the settings from the environment (`HIERO_NETWORK`, `HIERO_MIRROR_NODE_*`):
 
 ```ts
 import { createMirrorNodeClient } from "@hiero-hackers/enterprise-mirror";
-const mirror = createMirrorNodeClient(); // reads HIERO_NETWORK / HIERO_MIRROR_NODE_*
+
+const mirror = createMirrorNodeClient();
 ```
 
 ## Repositories
 
-| Repository              | What it covers                                                                                                                                                                                                                                                |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AccountRepository`     | Accounts by ID/alias, balances (current, point-in-time, or **network-wide historical snapshots**), per-token holdings, threshold scans, **staking-reward history**, pending/outstanding **airdrops**, live **allowances** (HBAR/token/NFT), account **hooks** |
-| `BlockRepository`       | Blocks (record files) by height, hash, or time window                                                                                                                                                                                                         |
-| `ContractRepository`    | The **EVM read surface** — contracts, execution results, event logs, storage, call traces, opcode-level replays, and read-only `contracts/call`                                                                                                               |
-| `NftRepository`         | NFTs by owner, type, or serial — plus a serial's full **transaction history** (provenance)                                                                                                                                                                    |
-| `TokenRepository`       | Token metadata (current or historical), **network-wide token search** (partial name match, type), tokens held by an account, holder threshold scans & **historical holder snapshots**                                                                         |
-| `TopicRepository`       | Topic **metadata** (keys, HIP-991 fees) and messages by topic, sequence number, or consensus timestamp                                                                                                                                                        |
-| `TransactionRepository` | Transactions network-wide or by account, filtered by type and time window                                                                                                                                                                                     |
-| `NetworkRepository`     | Exchange rates (current or **historical**), supply, staking rewards, per-node stake, registered nodes, the **fee schedule**, and HIP-1313 **fee estimation**                                                                                                  |
-| `ScheduleRepository`    | Scheduled transactions — signatures collected, executed/deleted state, expiry                                                                                                                                                                                 |
+| Repository | Covers |
+|---|---|
+| `AccountRepository` | Accounts by ID or alias; current, past and network-wide balances; token holdings; staking rewards; pending airdrops; allowances; hooks |
+| `BlockRepository` | Blocks by height, hash or time window |
+| `ContractRepository` | Contracts, execution results, event logs, storage, call traces, opcode replays, and read-only `contracts/call` |
+| `NftRepository` | NFTs by owner, token or serial, and each serial's transaction history |
+| `TokenRepository` | Token metadata, now or in the past; token search; tokens held by an account; holder lists and snapshots |
+| `TopicRepository` | Topic metadata (keys, HIP-991 fees) and messages by topic, sequence number or timestamp |
+| `TransactionRepository` | Transactions, network-wide or by account, filtered by type and time |
+| `NetworkRepository` | Exchange rates, supply, staking, node stake, registered nodes, the fee schedule and HIP-1313 fee estimates |
+| `ScheduleRepository` | Scheduled transactions: signatures, executed or deleted state, expiry |
 
-This covers the full mirror node REST API surface — all 47 paths and 48
-operations of spec v0.159, parameter-complete. The claim is enforced, not
-aspirational: the official OpenAPI spec is vendored under
-[`spec/`](./spec) and a coverage test diffs it against the client on
-every build. (The mirror node's gRPC subscription and Rosetta APIs are
-separate protocols and out of scope.)
+Together they cover every path and operation of the mirror node REST API: 47 paths and 48 operations in the vendored spec (v0.162). A test compares the client against the [spec](./spec) on every build, so the claim stays true. The mirror node's gRPC and Rosetta APIs are out of scope.
 
-Construct repositories individually, or all of them over one shared
-client (they draw from the same rate limiter either way):
+Create the repositories one by one, or all at once over one client. Either way they share its rate limiter:
 
 ```ts
 import { createMirrorRepositories } from "@hiero-hackers/enterprise-mirror";
-const { accountRepository, contractRepository } =
-    createMirrorRepositories(mirror);
+
+const { accountRepository, scheduleRepository } = createMirrorRepositories(mirror);
 ```
 
-Several of these are the **read-side counterparts of core's write services**: core grants allowances, sends airdrops and creates schedules — this package is how you see them.
+Many repositories show the results of core's writes: core sends airdrops and creates schedules, and these read them back.
 
 ```ts
-// What's waiting for this account to claim? (read-side of claimAirdrop)
+// Airdrops waiting for this account to claim
 const pending = await accountRepository.findPendingAirdrops("0.0.15");
 
-// Historical distribution: accounts holding ≥ 1M ℏ on 14 May 2022
+// Accounts holding at least 1M ℏ on 14 May 2022
 const snapshot = await accountRepository.listBalances({
-    balance: { gte: 100_000_000_000_000 },
-    timestamp: "1652531199.999999999",
+  balance: { gte: 100_000_000_000_000 },
+  timestamp: "1652531199.999999999",
 });
 
-// Has my scheduled transaction executed yet?
+// Has the scheduled transaction executed?
 const schedule = await scheduleRepository.findById("0.0.777");
 console.log(schedule.executedTimestamp, schedule.signatures.length);
 ```
 
-## Contracts & EVM
+## Contracts
 
-`ContractRepository` reads everything the EVM leaves behind — and can
-execute read-only calls. `contracts/call` is the API's one POST, but it is
-still free, keyless, and goes through the same rate gate:
+`ContractRepository` reads what the EVM leaves behind and runs read-only calls. `contracts/call` is the API's only POST, but it is still free, needs no keys and goes through the same rate limiter:
 
 ```ts
 import { ContractRepository } from "@hiero-hackers/enterprise-mirror";
+
 const contracts = new ContractRepository(mirror);
 
-// ERC-20 read via the HTS facade: USDC decimals()
+// USDC decimals(), through the token's ERC-20 facade
 const { result } = await contracts.call({
-    to: "0x000000000000000000000000000000000006f89a",
-    data: "0x313ce567",
+  to: "0x000000000000000000000000000000000006f89a",
+  data: "0x313ce567",
 });
 console.log(parseInt(result, 16)); // 6
 
-// Or estimate gas for the same call:
+// Estimate gas for the same call
 await contracts.call({ to, data, estimate: true });
 
-// What did an execution do? Result → logs/state changes → call frames:
+// What an execution did: result, then its call frames
 const details = await contracts.findResult("0xfebbaa…");
 const frames = await contracts.findActions(details.hash);
 
-// Event-log search (topic filters need a timestamp window ≤ 7 days):
+// Event logs (topic filters need a time window of 7 days or less)
 const transfers = await contracts.findLogs("0.0.5001", {
-    topic0: "0xddf252ad…", // Transfer(address,address,uint256)
-    timestamp: { gte: "1700000000.0", lt: "1700086400.0" },
+  topic0: "0xddf252ad…", // Transfer(address,address,uint256)
+  timestamp: { gte: "1700000000.0", lt: "1700086400.0" },
 });
 ```
 
-Amounts and gas values are in tinybars; addresses, call data, hashes,
-slots and topics are 0x-prefixed hex strings.
+Amounts and gas are in tinybars. Addresses, call data, hashes, slots and topics are `0x` hex strings.
 
 ## Pagination
 
-Every list method returns a **continuable `Page<T>`** — `data` plus a bound
-`next()` that fetches the following page with no path or converter to
-re-declare. Two generic helpers, `collectAll` and `paginate`, drive any
-page, so you never hand-roll a `while (links.next)` loop:
+Every list method returns a `Page<T>`: its `data`, and a `next()` that fetches the following page. `collectAll` and `paginate` work with any page:
 
 ```ts
 import { collectAll, paginate } from "@hiero-hackers/enterprise-mirror";
 
-// Collect everything, bounded so a surprise-huge result can't blow up memory:
+// Everything, capped so a huge result can't exhaust memory
 const all = await collectAll(await nftRepository.findByOwner("0.0.12345"), {
-    maxItems: 10_000,
+  maxItems: 10_000,
 });
 
-// Or stream page by page (memory-friendly for huge listings):
-for await (const page of paginate(
-    await topicRepository.findByTopicId("0.0.99"),
-)) {
-    for (const message of page) process(message);
+// One page at a time
+for await (const page of paginate(await topicRepository.findByTopicId("0.0.99"))) {
+  for (const message of page) handle(message);
 }
 
-// Or step manually:
+// Or by hand
 let page = await transactionRepository.findByAccount("0.0.12345");
 while (page.next) page = await page.next();
 ```
 
-`collectAll` accepts `{ maxItems, maxPages }` — omit both to fetch the
-entire set. Each page fetch runs through the rate limiter below.
+`collectAll` takes `{ maxItems, maxPages }`; leave both out to fetch everything. Every list method takes `{ limit, order }`. The mirror node caps `limit` (usually at 100), and `order` sorts by the endpoint's primary key.
 
-Snapshot endpoints (`/balances`, `/tokens/{id}/balances`) also report the
-consensus moment their figures describe — it's carried through as
-`page.timestamp`.
+Snapshot endpoints (`/balances`, `/tokens/{id}/balances`) also return the moment their figures describe, as `page.timestamp`.
 
-### Bidirectional (prev/next) pagination
+### Previous pages
 
-`Page.next()` walks the mirror node's `links.next` forward — perfect for a
-drain, but the mirror node emits **no `links.prev`**, so it can't step an
-interactive table _backward_. `KeysetPaginator` closes that: it reconstructs
-the missing direction with keyset (cursor) pagination — for a previous page it
-queries strictly before the current first row in the inverted order and
-reverses the result — over the same repository methods and `RangeFilter`
-params. You supply a one-line `load` adapter (bound → keyset param) and a
-`keyOf` (item → that same field); the paginator owns the operator/order
-algebra.
+The mirror node only links forward, so `Page` can't go back. `KeysetPaginator` can: it fetches the previous page by querying before the current first row in reverse order. You give it a `load` function and a `keyOf` that returns the field you page by:
 
 ```ts
-import {
-    TransactionRepository,
-    KeysetPaginator,
-} from "@hiero-hackers/enterprise-mirror";
+import { KeysetPaginator, TransactionRepository } from "@hiero-hackers/enterprise-mirror";
 
 const transactions = new TransactionRepository(mirror);
 const pager = new KeysetPaginator({
-    order: "desc",
-    limit: 25,
-    keyOf: (t) => t.consensusTimestamp,
-    load: (bound, order, limit) =>
-        transactions
-            .findByAccount("0.0.98", {
-                order,
-                limit,
-                timestamp: bound ? { [bound.operator]: bound.key } : undefined,
-            })
-            .then((page) => page.data),
+  order: "desc",
+  limit: 25,
+  keyOf: (t) => t.consensusTimestamp,
+  load: (bound, order, limit) =>
+    transactions
+      .findByAccount("0.0.98", {
+        order,
+        limit,
+        timestamp: bound ? { [bound.operator]: bound.key } : undefined,
+      })
+      .then((page) => page.data),
 });
 
 const first = await pager.first(); // newest 25
-const older = await pager.next(); // next 25, older
-const back = await pager.previous(); // ← back to `first`
-pager.hasPrevious; // false — we're on page one again
+const older = await pager.next(); // the 25 before them
+const back = await pager.previous(); // back to the first page
+pager.hasPrevious; // false
 ```
 
-`hasNext` / `hasPrevious` gate the table's arrows; `first`/`next`/`previous`
-mutate one shared window, so await each before the next.
+`hasNext` and `hasPrevious` tell a table which arrows to enable. `first`, `next` and `previous` share one window, so await each call before the next.
 
-**Page size & ordering.** Every list method takes `{ limit, order }`. The
-mirror node caps `limit` (typically at 100) and `order` sorts by the
-endpoint's primary key — both are preserved across `links.next`.
+## Filters
 
-## Filtering
-
-**Transactions** take a bundled query — type, consensus-timestamp window,
-optionally an account, plus page controls. Omit `accountId` to search
-network-wide:
+**Transactions** take a type, a time window and optionally an account. Leave out `accountId` to search the whole network:
 
 ```ts
 const transfers = await transactionRepository.find({
-    transactionType: "CRYPTOTRANSFER",
-    timestamp: { gte: "1700000000.0", lt: "1700086400.0" },
-    limit: 100,
+  transactionType: "CRYPTOTRANSFER",
+  timestamp: { gte: "1700000000.0", lt: "1700086400.0" },
+  limit: 100,
 });
 ```
 
-**Point-in-time reads** — historical state for time-series analysis:
+**Point in time**: read past state.
 
 ```ts
 const then = await accountRepository.findByAccountId("0.0.98", {
-    timestamp: "1700000000.000000000",
+  timestamp: "1700000000.000000000",
 });
 const supply = await networkRepository.findNetworkSupplies({
-    timestamp: "1700000000.000000000",
+  timestamp: "1700000000.000000000",
 });
-// Historical HBAR/cent price, token supply, and holder snapshots too:
 const rate = await networkRepository.findExchangeRates({ timestamp });
 const usdc = await tokenRepository.findById("0.0.456858", { timestamp });
 ```
 
-**Fee estimation** (HIP-1313) — POST the protobuf-encoded transaction
-bytes (e.g. from core's `transaction.toBytes()`), get a node/network/
-service breakdown in tinycents without submitting:
+**Fee estimates** (HIP-1313): send a transaction's protobuf bytes, for example from `transaction.toBytes()`, and get its fees in tinycents without submitting it:
 
 ```ts
 const estimate = await networkRepository.estimateFees(transactionBytes);
 console.log(estimate.total, estimate.node.base, estimate.service.base);
 ```
 
-**Discrete ID lists** — entity-ID filters accept a single ID, an array
-(sent as repeated params; the mirror node returns the union), or a range:
+**ID lists**: ID filters take one ID, an array or a range. An array is sent as repeated parameters, and the mirror node returns all matches:
 
 ```ts
-// One request, three specific accounts:
 const trio = await accountRepository.list({
-    accountId: ["0.0.98", "0.0.800", "0.0.801"],
+  accountId: ["0.0.98", "0.0.800", "0.0.801"],
 });
 ```
 
-**Balance thresholds** — greater/less-than filters on the account and
-token-holder listings (amounts in the smallest unit; rank by balance
-client-side, since `order` sorts by account ID):
+**Balance thresholds**: account and token-holder lists filter by balance, in the smallest unit. `order` sorts by account ID, so sort by balance yourself:
 
 ```ts
 const largeAccounts = await accountRepository.list({
-    balance: { gte: 100_000_000_000 }, // ≥ 1,000 ℏ, in tinybars
+  balance: { gte: 100_000_000_000 }, // 1,000 ℏ or more, in tinybars
 });
 const holders = await tokenRepository.findHolders("0.0.456858", {
-    accountBalance: { gte: 1_000_000 }, // ≥ 1 USDC at 6 decimals
+  accountBalance: { gte: 1_000_000 }, // 1 USDC or more, at 6 decimals
 });
 ```
 
-## Rate limiting & concurrency
+## Rate limits
 
-The client throttles **pro-actively** instead of only backing off after an
-HTTP 429 — essential when draining large result sets:
+The client limits its own request rate, so large reads stay under the mirror node's limits instead of waiting out HTTP 429s:
 
-| Option                 | Default     | What it does                                                                   |
-| ---------------------- | ----------- | ------------------------------------------------------------------------------ |
-| `maxConcurrent`        | `25`        | Maximum requests in flight at once; extra requests queue. `Infinity` disables. |
-| `maxRequestsPerSecond` | _unlimited_ | Ceiling on sustained request rate (e.g. `50` stays under 50 TPS).              |
+| Option | Default | Does |
+|---|---|---|
+| `maxConcurrent` | `25` | Requests in flight at once; the rest wait. `Infinity` turns it off. |
+| `maxRequestsPerSecond` | none | Sustained request rate, e.g. `50` |
 
-Both compose with the built-in `Retry-After`-aware retry. Invalid values
-throw a `MirrorError` at construction. Configure per client, via
-`MirrorConfig`, or via environment:
+Both work with the built-in retry, which honours `Retry-After`. Invalid values throw a `MirrorError` when the client is created. Set them per client, in `MirrorConfig`, or in the environment:
 
-```bash
+```sh
 HIERO_MIRROR_NODE_MAX_CONCURRENT=25
 HIERO_MIRROR_NODE_MAX_REQUESTS_PER_SECOND=50
 HIERO_MIRROR_NODE_TIMEOUT_MS=10000
@@ -287,62 +237,28 @@ HIERO_MIRROR_NODE_MAX_RETRIES=3
 HIERO_MIRROR_NODE_RETRY_ON_404=false
 ```
 
-### Retrying freshly-created entities (`retryOn404`)
+### New entities
 
-Mirror nodes are eventually consistent: an entity can briefly return
-**HTTP 404** in the short window between its creating transaction reaching
-consensus and the mirror node importing it. When you query an entity right
-after creating it, retry the 404 on the same `maxRetries` budget and backoff
-as 429/5xx instead of failing immediately.
-
-Prefer the per-call `withRetryOn404()` view, so only the just-created lookup
-pays the extra retries — every other query on the client keeps failing fast
-on a genuine 404:
+A new entity can return HTTP 404 for a moment, between reaching consensus and being imported by the mirror node. To read one right after creating it, use `withRetryOn404()`. It retries the 404 with the same retry budget and backoff as a 429 or 5xx:
 
 ```ts
 const account = await client.withRetryOn404().queryAccount(newAccountId);
 ```
 
-The view shares the base client's concurrency + rate gate, so the pair
-counts against a single budget rather than doubling your effective request
-rate against the node.
+The view shares the client's rate limiter, so it doesn't double your request rate. Other queries on the client still fail fast on a real 404.
 
-A client-wide `retryOn404: true` option (or `HIERO_MIRROR_NODE_RETRY_ON_404=true`)
-also exists, but it applies to **every** query — including genuine
-"no such entity" lookups, which then cost `maxRetries + 1` requests each
-before resolving. Reach for it only when a client exclusively reads
-freshly-created entities; otherwise use the view.
+`retryOn404: true` (or `HIERO_MIRROR_NODE_RETRY_ON_404=true`) does the same for every query on the client, so a lookup for something that doesn't exist costs `maxRetries + 1` requests. Use it only for a client that reads nothing but new entities. Either way, a 404 that lasts ends as `NOT_FOUND`.
 
-Retry-on-404 defaults to **off** because a 404 is normally a legitimate "no
-such entity". Either way, a persistent 404 exhausts the retries and still
-surfaces as `NOT_FOUND` — so `orNull` keeps treating genuine absence as
-`null` (see [Errors](#errors)).
+## Request events
 
-## Request telemetry (observer)
-
-The client owns queueing and retries internally, so a caller sees only a
-promise that eventually settles. An optional **observer** restores
-visibility for UIs — a loading indicator counts balanced start/end pairs
-(queue time included), a status banner distinguishes "busy, retrying" from
-a terminal failure.
-
-**This is read-only telemetry, not middleware** — observers receive plain
-data and cannot mutate, intercept, or cancel requests. Guarantees: one
-`onRequestEnd` per `onRequestStart` on every transport outcome (success,
-HTTP error, timeout, unreadable body); retries surface via `onRetry`
-without producing extra pairs; callbacks are error-isolated — an observer
-bug never affects the request. The bracket covers the *transport*: schema
-validation runs after it, so a payload that arrives but fails validation
-ends as a transport success — `errorCode` present means the wire request
-itself failed. The `withRetryOn404()` view reports through the same
-observer.
+The client queues and retries internally, so callers only see a promise. An `observer` reports what happens underneath, for example to drive a loading spinner or a "retrying" banner:
 
 ```ts
 const client = new MirrorNodeClient(url, {
   observer: {
     onRequestStart: () => spinner.increment(),
     onRetry: ({ status, delayMs }) =>
-      banner.busy(`mirror node ${status ?? 'timeout'}, retrying in ${delayMs}ms`),
+      banner.busy(`mirror node ${status ?? "timeout"}, retrying in ${delayMs}ms`),
     onRequestEnd: (e) => {
       spinner.decrement();
       if (e.errorCode && e.status !== 404) banner.error(e.errorCode);
@@ -351,111 +267,82 @@ const client = new MirrorNodeClient(url, {
 });
 ```
 
-## Amounts are strings
+Observers only receive data; they can't change, block or cancel a request.
 
-Every **unbounded** tinybar and token-amount field on the public types is a
-decimal `string`, not a `number` — balances, transfer legs, fees, allowances,
-airdrops, staking figures, custom-fee amounts. This is a correctness
-requirement, not a style choice: live mainnet balances exceed
-`Number.MAX_SAFE_INTEGER` (2^53 ≈ 90.07M ℏ in tinybars), and `JSON.parse`
-silently rounds such values. The client parses responses losslessly
-(`utils/LosslessJson.ts`), so the strings are digit-exact copies of what the
-mirror node sent.
+- Every `onRequestStart` gets exactly one `onRequestEnd`, whatever the outcome.
+- Retries call `onRetry` and don't start a new pair.
+- An observer that throws never affects the request.
+- The events cover the HTTP request only. A response that arrives but fails schema validation still ends as a success; `errorCode` is set only when the request itself failed.
+
+`withRetryOn404()` reports through the same observer.
+
+## Amounts
+
+Every amount that can grow without limit is a decimal `string`: balances, transfers, fees, allowances, airdrops, staking figures and custom fees. Mainnet balances exceed `Number.MAX_SAFE_INTEGER` (2^53, about 90.07M ℏ in tinybars), and `JSON.parse` rounds such numbers silently. The client parses responses without that loss, so each string is exactly what the mirror node sent.
 
 ```ts
 const balance = await client.queryAccountBalance("0.0.2");
-BigInt(balance.tinybars) + 1n;        // arithmetic: one wrapper call
-tinybarToHbar(balance.tinybars);      // display: unit helpers below
-console.log(balance.tinybars);        // logs, JSON, React — just works
+BigInt(balance.tinybars) + 1n; // arithmetic
+tinybarToHbar(balance.tinybars); // display
+console.log(balance.tinybars); // logs and JSON work as is
 ```
 
-Why `string` and not the alternatives:
-
-| amounts as… | exact above 2^53 | `JSON.stringify`, logs | arithmetic |
-| --- | --- | --- | --- |
-| `number` | ✗ silently rounds | ✓ | ✓ but wrong |
-| `BigInt` | ✓ | ✗ throws `TypeError` | ✓ |
+| Amounts as… | Exact above 2^53 | `JSON.stringify`, logs | Arithmetic |
+|---|---|---|---|
+| `number` | ✗ rounds silently | ✓ | ✓ but wrong |
+| `BigInt` | ✓ | ✗ throws | ✓ |
 | `string` | ✓ | ✓ | `BigInt(x)` first |
 
-Fields that are structurally bounded far below 2^53 stay `number` (gas
-values, counters, network-computed quotes). If a field can grow with a
-user's holdings — or is user-chosen, like hook ids, custom-fee fraction
-numerators/denominators, and EIP-7702 authorization nonces, where any
-int64 is legitimate data — it is a string; if the protocol bounds it, it
-is a number. The line is machine-enforced against the vendored OpenAPI
-spec by `spec/diff-response-fields.mjs`.
+Fields the protocol keeps small stay `number`: gas, counters and quotes the network computes. Fields that grow with holdings, or that users choose (hook IDs, custom-fee fractions, EIP-7702 nonces), are strings. `spec/diff-response-fields.mjs` checks this against the spec.
 
-## Unit & timestamp helpers
+## Units and timestamps
 
 ```ts
 import {
-    tinybarToHbar,
-    hbarToTinybar, // 250_000_000 ⇄ 2.5 ℏ
-    formatUnits,
-    parseUnits, // "2500000" @ 6 decimals ⇄ 2.5 USDC
-    toConsensusTimestamp,
-    fromConsensusTimestamp, // Date/ms ⇄ "seconds.nanoseconds"
-    timestampRange, // { from, to } dates → { gte, lt } window
+  formatUnits,
+  fromConsensusTimestamp,
+  hbarToTinybar,
+  parseUnits,
+  timestampRange,
+  tinybarToHbar,
+  toConsensusTimestamp,
 } from "@hiero-hackers/enterprise-mirror";
 
+hbarToTinybar(2.5); // "250000000"
+parseUnits(2.5, 6); // "2500000", e.g. 2.5 USDC
+toConsensusTimestamp(new Date()); // "1700000000.000000000" format
+
 await transactionRepository.find({
-    transactionType: "CRYPTOTRANSFER",
-    timestamp: timestampRange({ from: dayStart, to: dayEnd }),
+  transactionType: "CRYPTOTRANSFER",
+  timestamp: timestampRange({ from: dayStart, to: dayEnd }),
 });
 ```
 
-The builder direction (`hbarToTinybar`, `parseUnits`) returns exact decimal
-strings at any magnitude — `parseUnits(2, 18)` is `"2000000000000000000"`,
-which `number` math cannot even represent — so the outputs compose with the
-string amount fields and query thresholds. The display direction
-(`tinybarToHbar`, `formatUnits`) returns `number` and is approximate above
-2^53 smallest units: fine for rendering, not for arithmetic.
-
-For values past that point — the whale balances the lossless parse exists
-for — the `-Exact` variants (`tinybarToHbarExact`, `formatUnitsExact`)
-return the display value as a digit-exact decimal string instead:
-`formatUnitsExact("31869085891081369", 8)` is `"318690858.91081369"`,
-where the `number` helper has already rounded. They are the exact inverse
-of the builders: `parseUnits(formatUnitsExact(x, d), d) === x`.
+- `hbarToTinybar` and `parseUnits` return exact strings at any size: `parseUnits(2, 18)` is `"2000000000000000000"`.
+- `tinybarToHbar` and `formatUnits` return a `number` for display. Above 2^53 smallest units they are approximate.
+- `tinybarToHbarExact` and `formatUnitsExact` return an exact string instead: `formatUnitsExact("31869085891081369", 8)` is `"318690858.91081369"`. They are the exact inverse of `parseUnits`.
 
 ## Errors
 
-Failures throw `MirrorError` with a machine-readable `code`
-(`MIRROR_NODE_ERROR`, `MIRROR_NODE_HTTP_ERROR`,
-`MIRROR_NODE_SCHEMA_MISMATCH`, `MALFORMED_RESPONSE`, `TIMED_OUT`,
-`NOT_FOUND`, `CONFIG_INVALID`) — deliberately distinct from core's
-`HieroError`, so an `instanceof` check tells you which subsystem failed.
-HTTP failures also carry the `status` — including `MALFORMED_RESPONSE`
-(a body that is not JSON at all, typically a gateway's HTML error page),
-where a `status` of 200 is itself the diagnostic.
+Failures throw `MirrorError` with a `code`: `MIRROR_NODE_ERROR`, `MIRROR_NODE_HTTP_ERROR`, `MIRROR_NODE_SCHEMA_MISMATCH`, `MALFORMED_RESPONSE`, `TIMED_OUT`, `NOT_FOUND` or `CONFIG_INVALID`. It is a different class from core's `HieroError`, so `instanceof` tells you which package failed. HTTP failures also carry the `status`. A `MALFORMED_RESPONSE` with status 200 means the body wasn't JSON, typically a gateway's HTML error page.
 
-Absence is a normal answer, not a failure: every "no such entity"
-rejection — an HTTP 404 or an empty listing — carries `NOT_FOUND`, and
-`orNull` converts exactly those to `null`, re-throwing everything else:
+A missing entity is a normal answer. An HTTP 404 or an empty result rejects with `NOT_FOUND`, and `orNull` turns exactly those into `null`:
 
 ```ts
 import { orNull } from "@hiero-hackers/enterprise-mirror";
 
 const account = await orNull(accounts.findAccount("0.0.98"));
 if (account === null) {
-    // never existed (or not yet imported by this mirror node)
+  // doesn't exist, or the mirror node hasn't imported it yet
 }
 ```
 
-If the `null` is because the entity was *just* created and hasn't been
-imported yet, use [`withRetryOn404()`](#retrying-freshly-created-entities-retryon404)
-so the client waits it out before giving up.
+If the entity was just created, use [`withRetryOn404()`](#new-entities) instead.
 
 ## Examples
 
-Runnable, credential-free examples live in
-[`samples/examples/src/mirror`](../../samples/examples/src/mirror): account, token/NFT,
-transaction, topic and network query tours; a contracts/EVM tour (blocks,
-results, logs, `contracts/call`); the read-side counterparts of core's
-write services (schedules, airdrops, allowances); time-series building
-with ASCII charts; concurrent fan-out through the rate limiter; config &
-error-handling patterns; and a rate-limited pagination-at-scale demo.
+[`samples/examples/src/mirror`](../../samples/examples/src/mirror) runs against mainnet with no credentials. It shows query filters and the three ways to page through results.
 
 ## License
 
-[Apache-2.0](../../LICENSE)
+Apache-2.0 — see [LICENSE](../../LICENSE)

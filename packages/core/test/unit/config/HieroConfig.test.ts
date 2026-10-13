@@ -172,6 +172,65 @@ describe("resolveConfigFromEnv", () => {
         expect(config?.mirrorNodeUrl).toBeUndefined();
         process.env = env;
     });
+
+    it("parses the SDK tuning env vars", () => {
+        process.env = {
+            HIERO_NETWORK: "testnet",
+            HIERO_OPERATOR_ID: "0.0.1",
+            HIERO_OPERATOR_KEY: "key123",
+            HIERO_OPERATOR_KEY_TYPE: "ed25519",
+            HIERO_REQUEST_TIMEOUT_MS: "60000",
+            HIERO_GRPC_DEADLINE_MS: "5000",
+            HIERO_MAX_ATTEMPTS: "3",
+            HIERO_MIN_BACKOFF_MS: "100",
+            HIERO_MAX_BACKOFF_MS: "4000",
+        };
+        expect(resolveConfigFromEnv()).toMatchObject({
+            requestTimeoutMs: 60000,
+            grpcDeadlineMs: 5000,
+            maxAttempts: 3,
+            minBackoffMs: 100,
+            maxBackoffMs: 4000,
+        });
+        process.env = env;
+    });
+
+    it("leaves the SDK tuning fields unset when their env vars are empty", () => {
+        process.env = {
+            HIERO_NETWORK: "testnet",
+            HIERO_OPERATOR_ID: "0.0.1",
+            HIERO_OPERATOR_KEY: "key123",
+            HIERO_OPERATOR_KEY_TYPE: "ed25519",
+            HIERO_MAX_ATTEMPTS: "",
+        };
+        const config = resolveConfigFromEnv();
+        expect(config?.requestTimeoutMs).toBeUndefined();
+        expect(config?.maxAttempts).toBeUndefined();
+        process.env = env;
+    });
+
+    it.each(["abc", "0", "-5", "Infinity"])(
+        "rejects HIERO_MAX_ATTEMPTS=%s with CONFIG_INVALID",
+        (value) => {
+            process.env = {
+                HIERO_NETWORK: "testnet",
+                HIERO_OPERATOR_ID: "0.0.1",
+                HIERO_OPERATOR_KEY: "key123",
+                HIERO_OPERATOR_KEY_TYPE: "ed25519",
+                HIERO_MAX_ATTEMPTS: value,
+            };
+            try {
+                expect(() => resolveConfigFromEnv()).toThrow(
+                    expect.objectContaining({
+                        code: HieroErrorCodes.ConfigInvalid,
+                        message: `HIERO_MAX_ATTEMPTS must be a positive number, got "${value}".`,
+                    }),
+                );
+            } finally {
+                process.env = env;
+            }
+        },
+    );
 });
 
 describe("assertEnvConfigValid", () => {
