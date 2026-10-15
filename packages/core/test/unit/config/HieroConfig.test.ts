@@ -4,30 +4,25 @@ import {
     assertEnvConfigValid,
 } from "../../../src/config/index.js";
 import { OperatorKeyType } from "../../../src/types/index.js";
-import { HieroError, HieroErrorCodes } from "../../../src/errors/index.js";
+import { HieroErrorCodes } from "../../../src/errors/index.js";
 
 describe("resolveConfigFromEnv", () => {
     const env = process.env;
 
-    it("throws when env vars are missing", () => {
-        process.env = {};
-        expect(() => resolveConfigFromEnv()).toThrow(HieroError);
-        expect(() => resolveConfigFromEnv()).toThrow(/Missing required/);
-        process.env = env;
-    });
-
-    it("throws with CONFIG_INVALID when env vars are missing", () => {
+    it("throws CONFIG_INVALID naming every missing env var", () => {
         process.env = {};
         try {
-            resolveConfigFromEnv();
-            expect.fail("Should have thrown");
-        } catch (error) {
-            expect(error).toBeInstanceOf(HieroError);
-            expect((error as HieroError).code).toBe(
-                HieroErrorCodes.ConfigInvalid,
+            expect(() => resolveConfigFromEnv()).toThrow(
+                expect.objectContaining({
+                    code: HieroErrorCodes.ConfigInvalid,
+                    message: expect.stringMatching(
+                        /HIERO_NETWORK[\s\S]*HIERO_OPERATOR_ID[\s\S]*HIERO_OPERATOR_KEY[\s\S]*HIERO_OPERATOR_KEY_TYPE/,
+                    ),
+                }),
             );
+        } finally {
+            process.env = env;
         }
-        process.env = env;
     });
 
     it("resolves HIERO_ prefixed env vars", () => {
@@ -47,18 +42,25 @@ describe("resolveConfigFromEnv", () => {
         process.env = env;
     });
 
-    it("throws when operatorKeyType is missing", () => {
+    it("throws CONFIG_INVALID when operatorKeyType is missing", () => {
         process.env = {
             HIERO_NETWORK: "testnet",
             HIERO_OPERATOR_ID: "0.0.1",
             HIERO_OPERATOR_KEY: "key123",
         };
-        expect(() => resolveConfigFromEnv()).toThrow(HieroError);
-        expect(() => resolveConfigFromEnv()).toThrow(/HIERO_OPERATOR_KEY_TYPE/);
-        process.env = env;
+        try {
+            expect(() => resolveConfigFromEnv()).toThrow(
+                expect.objectContaining({
+                    code: HieroErrorCodes.ConfigInvalid,
+                    message: expect.stringContaining("HIERO_OPERATOR_KEY_TYPE"),
+                }),
+            );
+        } finally {
+            process.env = env;
+        }
     });
 
-    it("throws CONFIG_INVALID for invalid operatorKeyType", () => {
+    it("throws CONFIG_INVALID for an unknown operatorKeyType", () => {
         process.env = {
             HIERO_NETWORK: "testnet",
             HIERO_OPERATOR_ID: "0.0.2",
@@ -66,19 +68,15 @@ describe("resolveConfigFromEnv", () => {
             HIERO_OPERATOR_KEY_TYPE: "rsa",
         };
         try {
-            resolveConfigFromEnv();
-            expect.fail("Should have thrown");
-        } catch (error) {
-            expect(error).toBeInstanceOf(HieroError);
-            expect((error as HieroError).code).toBe(
-                HieroErrorCodes.ConfigInvalid,
+            expect(() => resolveConfigFromEnv()).toThrow(
+                expect.objectContaining({
+                    code: HieroErrorCodes.ConfigInvalid,
+                    message: `HIERO_OPERATOR_KEY_TYPE must be one of 'ed25519', 'ecdsa', 'der', got "rsa".`,
+                }),
             );
-            expect((error as HieroError).message).toContain("rsa");
-            expect((error as HieroError).message).toMatch(
-                /ed25519.*ecdsa.*der/,
-            );
+        } finally {
+            process.env = env;
         }
-        process.env = env;
     });
 
     it("parses HIERO_NETWORK_NODES for custom networks", () => {
@@ -89,54 +87,47 @@ describe("resolveConfigFromEnv", () => {
             HIERO_OPERATOR_KEY_TYPE: "ed25519",
             HIERO_NETWORK_NODES: "127.0.0.1:50211=0.0.3, 127.0.0.1:50212=0.0.4",
         };
-        expect(resolveConfigFromEnv()?.networkNodes).toMatchObject({
+        expect(resolveConfigFromEnv().networkNodes).toMatchObject({
             "127.0.0.1:50211": "0.0.3",
             "127.0.0.1:50212": "0.0.4",
         });
         process.env = env;
     });
 
-    it("throws CONFIG_INVALID for malformed HIERO_NETWORK_NODES entries", () => {
-        process.env = {
-            HIERO_NETWORK: "local",
-            HIERO_OPERATOR_ID: "0.0.1",
-            HIERO_OPERATOR_KEY: "key123",
-            HIERO_OPERATOR_KEY_TYPE: "ed25519",
-            HIERO_NETWORK_NODES: "127.0.0.1:50211,127.0.0.1:50212=0.0.4",
-        };
-        try {
-            resolveConfigFromEnv();
-            expect.fail("Should have thrown");
-        } catch (error) {
-            expect(error).toBeInstanceOf(HieroError);
-            expect((error as HieroError).code).toBe(
-                HieroErrorCodes.ConfigInvalid,
-            );
-            expect((error as HieroError).message).toContain("127.0.0.1:50211");
-            expect((error as HieroError).message).toContain('missing "="');
-        }
-        process.env = env;
-    });
+    it.each(["127.0.0.1:50211", "=0.0.3", "127.0.0.1:50211="])(
+        "rejects the malformed HIERO_NETWORK_NODES entry %s with CONFIG_INVALID",
+        (entry) => {
+            process.env = {
+                HIERO_NETWORK: "local",
+                HIERO_OPERATOR_ID: "0.0.1",
+                HIERO_OPERATOR_KEY: "key123",
+                HIERO_OPERATOR_KEY_TYPE: "ed25519",
+                HIERO_NETWORK_NODES: `127.0.0.1:50212=0.0.4,${entry}`,
+            };
+            try {
+                expect(() => resolveConfigFromEnv()).toThrow(
+                    expect.objectContaining({
+                        code: HieroErrorCodes.ConfigInvalid,
+                        message: `HIERO_NETWORK_NODES entry "${entry}" is malformed. Expected "host:port=accountId".`,
+                    }),
+                );
+            } finally {
+                process.env = env;
+            }
+        },
+    );
 
-    it("throws CONFIG_INVALID when all HIERO_NETWORK_NODES entries are malformed", () => {
+    it("ignores empty HIERO_NETWORK_NODES entries", () => {
         process.env = {
             HIERO_NETWORK: "local",
             HIERO_OPERATOR_ID: "0.0.1",
             HIERO_OPERATOR_KEY: "key123",
             HIERO_OPERATOR_KEY_TYPE: "ed25519",
-            HIERO_NETWORK_NODES: "127.0.0.1:50211,127.0.0.1:50212",
+            HIERO_NETWORK_NODES: "127.0.0.1:50211=0.0.3,",
         };
-        try {
-            resolveConfigFromEnv();
-            expect.fail("Should have thrown");
-        } catch (error) {
-            expect(error).toBeInstanceOf(HieroError);
-            expect((error as HieroError).code).toBe(
-                HieroErrorCodes.ConfigInvalid,
-            );
-            expect((error as HieroError).message).toContain("127.0.0.1:50211");
-            expect((error as HieroError).message).toContain("127.0.0.1:50212");
-        }
+        expect(resolveConfigFromEnv().networkNodes).toEqual({
+            "127.0.0.1:50211": "0.0.3",
+        });
         process.env = env;
     });
 
@@ -166,8 +157,8 @@ describe("resolveConfigFromEnv", () => {
             HIERO_MIRROR_NODE_URL: "",
         };
         const config = resolveConfigFromEnv();
-        expect(config?.mirrorNetwork).toBeUndefined();
-        expect(config?.mirrorNodeUrl).toBeUndefined();
+        expect(config.mirrorNetwork).toBeUndefined();
+        expect(config.mirrorNodeUrl).toBeUndefined();
         process.env = env;
     });
 
@@ -202,8 +193,8 @@ describe("resolveConfigFromEnv", () => {
             HIERO_MAX_ATTEMPTS: "",
         };
         const config = resolveConfigFromEnv();
-        expect(config?.requestTimeoutMs).toBeUndefined();
-        expect(config?.maxAttempts).toBeUndefined();
+        expect(config.requestTimeoutMs).toBeUndefined();
+        expect(config.maxAttempts).toBeUndefined();
         process.env = env;
     });
 
@@ -234,13 +225,7 @@ describe("resolveConfigFromEnv", () => {
 describe("assertEnvConfigValid", () => {
     const env = process.env;
 
-    it("throws when env vars are missing", () => {
-        process.env = {};
-        expect(() => assertEnvConfigValid()).toThrow(HieroError);
-        process.env = env;
-    });
-
-    it("throws CONFIG_INVALID for invalid operatorKeyType", () => {
+    it("throws CONFIG_INVALID for an unknown operatorKeyType", () => {
         process.env = {
             HIERO_NETWORK: "testnet",
             HIERO_OPERATOR_ID: "0.0.2",
@@ -248,15 +233,14 @@ describe("assertEnvConfigValid", () => {
             HIERO_OPERATOR_KEY_TYPE: "rsa",
         };
         try {
-            assertEnvConfigValid();
-            expect.fail("Should have thrown");
-        } catch (error) {
-            expect(error).toBeInstanceOf(HieroError);
-            expect((error as HieroError).code).toBe(
-                HieroErrorCodes.ConfigInvalid,
+            expect(() => assertEnvConfigValid()).toThrow(
+                expect.objectContaining({
+                    code: HieroErrorCodes.ConfigInvalid,
+                }),
             );
+        } finally {
+            process.env = env;
         }
-        process.env = env;
     });
 
     it("does not throw when env is valid", () => {

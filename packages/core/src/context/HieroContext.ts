@@ -115,7 +115,6 @@ export class HieroContext implements IHieroContext {
     private mirrorNodeTransport?: HttpTransport;
 
     constructor(config?: HieroConfig) {
-        // resolveConfigFromEnv() now throws CONFIG_INVALID instead of returning null
         const resolved = config ?? resolveConfigFromEnv();
         this.config = { ...resolved, operatorKey: "[redacted]" };
 

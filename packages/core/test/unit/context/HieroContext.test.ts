@@ -81,17 +81,24 @@ describe("HieroContext", () => {
             expect(configModule.resolveConfigFromEnv).toHaveBeenCalled();
         });
 
-        it("throws CONFIG_INVALID from resolveConfigFromEnv when env is invalid", () => {
-            vi.spyOn(configModule, "resolveConfigFromEnv").mockImplementation(
-                () => {
-                    throw new HieroError("Invalid config", {
+        it("throws CONFIG_INVALID for an unknown HIERO_OPERATOR_KEY_TYPE", () => {
+            const env = process.env;
+            process.env = {
+                HIERO_NETWORK: "testnet",
+                HIERO_OPERATOR_ID: "0.0.2",
+                HIERO_OPERATOR_KEY: "abc",
+                HIERO_OPERATOR_KEY_TYPE: "rsa",
+            };
+            try {
+                expect(() => create()).toThrow(
+                    expect.objectContaining({
                         code: HieroErrorCodes.ConfigInvalid,
-                    });
-                },
-            );
-
-            expect(() => create()).toThrow(HieroError);
-            expect(() => create()).toThrow(/Invalid config/);
+                        message: expect.stringContaining('"rsa"'),
+                    }),
+                );
+            } finally {
+                process.env = env;
+            }
         });
     });
 
