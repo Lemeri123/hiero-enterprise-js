@@ -1,4 +1,3 @@
-import type BigNumber from "bignumber.js";
 import { Long } from "@hiero-ledger/sdk";
 import { validationError } from "../../../errors/index.js";
 import type { TokenWipeOperationOptions } from "../operations/index.js";
@@ -82,7 +81,7 @@ export class TokenWipeValidator {
             isNegative = options.amount.isNegative();
         } else {
             // BigNumber
-            isNegative = (options.amount as BigNumber).isNegative();
+            isNegative = options.amount.isNegative();
         }
 
         if (isNegative) {
@@ -137,7 +136,7 @@ export class TokenWipeValidator {
 
             const isNonPositive = isLong
                 ? serial.isNegative() || serial.isZero()
-                : (serial as number) <= 0;
+                : serial <= 0;
 
             if (isNonPositive) {
                 throw validationError(

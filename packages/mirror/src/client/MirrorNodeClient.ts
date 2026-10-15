@@ -1588,9 +1588,7 @@ export class MirrorNodeClient {
             data,
             links: { ...links, next: nextLink },
             ...(timestamp !== undefined && { timestamp }),
-            next: nextLink
-                ? () => this.getPage(nextLink as string, converter)
-                : null,
+            next: nextLink ? () => this.getPage(nextLink, converter) : null,
         };
     }
 
@@ -1603,6 +1601,6 @@ export class MirrorNodeClient {
         nextLink: string,
         converter: (raw: unknown) => T,
     ): Promise<Page<T>> {
-        return this.getPage(nextLink, converter as (raw: never) => T);
+        return this.getPage(nextLink, converter);
     }
 }

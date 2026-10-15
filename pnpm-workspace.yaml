@@ -14,6 +14,10 @@ allowBuilds:
 #     disclosure). Pulled in via @hiero-ledger/sdk > ethers, which pins ws 8.17.1.
 # esbuild: GHSA-g7r4-m6w7-qqqr (low, dev-server arbitrary file read on Windows).
 #     Pulled in via tsup; vite peer-accepts ^0.27 || ^0.28.
+# @grpc/grpc-js: GHSA-m9gg-hp2v-232j (high, unauthorized certificates reported
+#     as authorized) + GHSA-f596-whhp-79r4 (low, handler errors sent to the
+#     client). Pulled in via @hiero-ledger/sdk, which pins 1.12.7.
 overrides:
     ws: ^8.21.3
     esbuild: ^0.28.2
+    "@grpc/grpc-js": ~1.13.7

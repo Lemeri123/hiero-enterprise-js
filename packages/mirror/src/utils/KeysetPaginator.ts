@@ -188,7 +188,7 @@ export class KeysetPaginator<T, K extends string | number = string | number> {
         this.started = true;
         this.atStart = true;
         this.atEnd = rows.length < this.limit;
-        this.headKey = rows.length > 0 ? this.keyOf(rows[0] as T) : null;
+        this.headKey = rows.length > 0 ? this.keyOf(rows[0]) : null;
         return this.window;
     }
 
@@ -204,7 +204,7 @@ export class KeysetPaginator<T, K extends string | number = string | number> {
             this.atEnd = true;
             return null;
         }
-        const last = this.window[this.window.length - 1] as T;
+        const last = this.window[this.window.length - 1];
         const operator: KeyOperator = this.order === "desc" ? "lt" : "gt";
         const rows = await this.load(
             { key: this.keyOf(last), operator },
@@ -233,7 +233,7 @@ export class KeysetPaginator<T, K extends string | number = string | number> {
         if (!this.started || this.atStart || this.window.length === 0) {
             return null;
         }
-        const firstItem = this.window[0] as T;
+        const firstItem = this.window[0];
         const operator: KeyOperator = this.order === "desc" ? "gt" : "lt";
         const invertedOrder: SortOrder = this.order === "desc" ? "asc" : "desc";
         const rows = await this.load(
@@ -254,7 +254,7 @@ export class KeysetPaginator<T, K extends string | number = string | number> {
         // full page (fewer rows exist before the old head than a page holds).
         this.atStart =
             (this.headKey !== null &&
-                this.keyOf(this.window[0] as T) === this.headKey) ||
+                this.keyOf(this.window[0]) === this.headKey) ||
             rows.length < this.limit;
         return this.window;
     }

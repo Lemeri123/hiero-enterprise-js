@@ -1,58 +1,61 @@
-# @hiero-hackers/enterprise-core examples
+# Examples
 
-Runnable scripts that exercise `@hiero-hackers/enterprise-core` directly (no framework). Each file in [`src/`](./src) is an independent example; the runner discovers them automatically.
+Runnable scripts for `@hiero-hackers/enterprise-core` and `@hiero-hackers/enterprise-mirror`, one feature per file.
 
-## Running
+Each file is self-contained: setup, constants and helpers are repeated in every file, so you can copy any one of them out as a starting point. The scripts make live network calls.
 
-```bash
-# from the repo root
-pnpm --filter @hiero-hackers/examples examples            # run every example
-pnpm --filter @hiero-hackers/examples examples mirror     # only files starting with "mirror"
+## Run
+
+From the repository root:
+
+```sh
+pnpm --filter @hiero-hackers/examples examples           # every example
+pnpm --filter @hiero-hackers/examples examples token     # only src/token/
+pnpm --filter @hiero-hackers/examples examples mirror    # only src/mirror/, no credentials needed
 ```
 
-The filter matches the start of the file path, so `mirror` runs everything under `src/mirror/`. The runner executes examples sequentially, streams each one's output live under its `[i/N]` header, and exits non-zero if any fail.
+The filter matches the start of the path under `src/`. Examples run one after another, each under an `[i/N]` header, and the run fails if any example fails.
 
-To run a single example on its own (e.g. while iterating on it):
+To run one file:
 
-```bash
+```sh
 cd samples/examples
 npx tsx src/mirror/queries.ts
 ```
 
-> These examples make **live network calls**. Read-only mirror-node examples work out of the box; examples that submit transactions need operator credentials (below).
-
-Each example is deliberately **self-contained** — client setup, constants, and small formatting helpers are repeated per file rather than shared, so any single file can be copied out as a complete, runnable starting point.
-
-A few mirror repository methods have no example on purpose: account **hooks** (`findHooks` / `findHookStorage` — HIP-1195 isn't deployed to mainnet's mirror yet), **registered nodes** (`findRegisteredNodes` — the registry is empty on mainnet today), and **fee estimation** (`estimateFees` — it needs protobuf transaction bytes from core's write side, so it belongs with the credentialed examples). All four are covered by unit tests.
-
 ## Configuration
 
-Copy the variables you need into a `.env` file in this directory (loaded automatically via `dotenv`).
+Put the variables in a `.env` file in this directory.
 
-### Mirror-node examples — no credentials required
+**Writes** need an operator account (see [`src/env.ts`](./src/env.ts)):
 
-Mirror-node reads don't cost fees or need keys, so these run against the public network as-is.
-
-| Variable | Default | Notes |
-|----------|---------|-------|
-| `HIERO_MIRROR_NODE_URL` | `https://mainnet.mirrornode.hedera.com` | Any mirror node REST endpoint |
-| `EXAMPLE_ACCOUNT_ID` | `0.0.98` | A busy, always-populated account so results aren't empty |
-
-### Write examples — operator credentials required
-
-Examples that submit transactions read operator credentials from the environment (see [`src/env.ts`](./src/env.ts)):
-
-```bash
+```sh
 HIERO_NETWORK=testnet
 HIERO_ED25519_OPERATOR_ID=0.0.12345
-HIERO_ED25519_OPERATOR_KEY=your_private_key
+HIERO_ED25519_OPERATOR_KEY=<your private key>
 # or the ECDSA pair:
 HIERO_ECDSA_OPERATOR_ID=0.0.12345
-HIERO_ECDSA_OPERATOR_KEY=your_private_key
+HIERO_ECDSA_OPERATOR_KEY=<your private key>
 ```
 
-## Examples
+**Mirror reads** need nothing; these are optional:
 
-| File | What it shows | Credentials |
-|------|---------------|-------------|
-| [`mirror/queries.ts`](./src/mirror/queries.ts) | The two non-obvious parts of `@hiero-hackers/enterprise-mirror`: composing filter/query properties (`limit`, `order`, `transactionType`, `timestamp: { gte }`) and walking pagination three ways — manual `page.next()`, streaming `paginate(...)`, one-shot `collectAll(...)` | None (mirror read) |
+| Variable | Default | Notes |
+|---|---|---|
+| `HIERO_MIRROR_NODE_URL` | `https://mainnet.mirrornode.hedera.com` | Any mirror node REST URL |
+| `EXAMPLE_ACCOUNT_ID` | `0.0.98` | A busy account, so results aren't empty |
+
+## What's included
+
+| Folder | Shows | Credentials |
+|---|---|---|
+| [`account`](./src/account) | Create accounts (single key, multisig, threshold, external or offline signer, scheduled, EVM alias), update, delete, transfer, allowances, signature checks | Operator |
+| [`token`](./src/token) | Fungible tokens and NFTs: create, mint, burn, wipe, freeze, KYC, pause, update, fee schedules, associations, airdrops | Operator |
+| [`topic`](./src/topic) | Create and update topics | Operator |
+| [`file`](./src/file) | Create, read and update files | Operator |
+| [`contract`](./src/contract) | Deploy, execute, update and delete contracts | Operator |
+| [`schedule`](./src/schedule) | Schedule, sign (also offline) and cancel transactions | Operator |
+| [`network`](./src/network) | Connect to a custom network, such as local Solo | Operator |
+| [`mirror`](./src/mirror) | Query filters, and paging through results three ways: `page.next()`, `paginate` and `collectAll` | None |
+
+A few mirror methods have no example: account hooks (`findHooks`, `findHookStorage`) and registered nodes (`findRegisteredNodes`) have no data on mainnet yet, and `estimateFees` needs transaction bytes from core. Unit tests cover all of them.

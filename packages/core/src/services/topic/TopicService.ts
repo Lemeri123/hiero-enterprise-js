@@ -277,8 +277,8 @@ export class TopicService {
      * the returned handle.
      *
      * @param options.topicId - Topic to subscribe to (required)
-     * @param options.startTime - Earliest consensus timestamp to deliver
-     * @param options.endTime - Stop point — subscription ends when reached
+     * @param options.startTime - Earliest consensus timestamp to deliver, as a `Date` or epoch milliseconds
+     * @param options.endTime - Stop point, as a `Date` or epoch milliseconds — subscription ends when reached
      * @param options.limit - Max number of messages to deliver before stopping
      * @param options.maxAttempts - Retry attempts on transient stream errors
      * @param options.maxBackoff - Cap on exponential-backoff delay (ms)

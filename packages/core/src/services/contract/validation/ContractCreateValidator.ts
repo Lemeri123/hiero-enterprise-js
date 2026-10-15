@@ -95,7 +95,7 @@ export class ContractCreateValidator {
             );
         }
 
-        if (Long.isLong(value) && (value as Long).isNegative()) {
+        if (Long.isLong(value) && value.isNegative()) {
             throw validationError(
                 "ContractCreateValidator",
                 "initialBalance must not be negative.",

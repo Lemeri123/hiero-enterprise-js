@@ -1,49 +1,43 @@
-# Express Sample
+# Express sample
 
-A REST API built with [Express](https://expressjs.com/), `@hiero-hackers/enterprise-core` and `@hiero-hackers/enterprise-mirror` demonstrating how to query accounts, tokens, NFTs, topics, and network data from a Hiero network.
-
-## Setup
-
-```bash
-# From the monorepo root
-pnpm install
-
-# Copy the example env and fill in your credentials
-cp .env.example .env
-```
-
-Edit the `.env` file — fill in the required fields (`HIERO_OPERATOR_ID`, `HIERO_OPERATOR_KEY`, `HIERO_OPERATOR_KEY_TYPE`) and uncomment any optional fields you need.
-
-You can get a free Hiero testnet account at https://portal.hedera.com.
+A REST API built with [Express](https://expressjs.com/), `@hiero-hackers/enterprise-core` and `@hiero-hackers/enterprise-mirror`.
 
 ## Run
 
-```bash
-# Development (with hot reload)
-pnpm --filter hiero-express-sample dev
+From the repository root:
 
-# Production
-pnpm --filter hiero-express-sample build
+```sh
+pnpm install
+cp samples/express-sample/.env.example samples/express-sample/.env
+```
+
+Fill in `HIERO_OPERATOR_ID`, `HIERO_OPERATOR_KEY` and `HIERO_OPERATOR_KEY_TYPE` in `.env`. You can get a free testnet account in the [Hedera Developer Portal](https://portal.hedera.com).
+
+```sh
+pnpm --filter hiero-express-sample dev     # with hot reload
+
+pnpm --filter hiero-express-sample build   # or build and start
 pnpm --filter hiero-express-sample start
 ```
 
 ## Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
+| Method | Path | Does |
+|---|---|---|
 | `GET` | `/api/balance` | Operator account balance |
-| `GET` | `/api/accounts/:id` | Account info from mirror node |
-| `GET` | `/api/accounts/:id/nfts` | NFTs owned by an account |
-| `GET` | `/api/tokens/:id` | Token info |
-| `GET` | `/api/topics/:id/messages` | Topic messages |
-| `POST` | `/api/topics` | Create a new topic |
+| `GET` | `/api/accounts/:id` | Account details, from the mirror node |
+| `GET` | `/api/accounts/:id/nfts` | NFTs the account owns |
+| `POST` | `/api/accounts` | Create an account |
+| `GET` | `/api/tokens/:id` | Token details, from the mirror node |
+| `GET` | `/api/topics/:id/messages` | A topic's messages |
+| `POST` | `/api/topics` | Create a topic |
 | `POST` | `/api/topics/:id/messages` | Submit a message to a topic |
-| `GET` | `/api/network/exchange-rates` | Current exchange rates |
-| `GET` | `/api/network/supply` | Network supply info |
+| `GET` | `/api/network/exchange-rates` | Current exchange rate |
+| `GET` | `/api/network/supply` | HBAR supply |
 
-## How It Works
+## How it works
 
-[`src/hiero.ts`](./src/hiero.ts) creates the Hiero services once at startup:
+[`src/hiero.ts`](./src/hiero.ts) creates the services once at startup:
 
 ```ts
 import { createHiero, toHttpError } from './hiero.js';
@@ -57,8 +51,8 @@ app.get('/api/balance', async (_req, res) => {
 
 `hiero` exposes:
 
-- **Services** (core): `accountService`, `topicService`. Add any other core service the same way.
+- **Services** (core): `accountService` and `topicService`. Add other core services the same way.
 - **Repositories** (mirror): `accountRepository`, `nftRepository`, `tokenRepository`, `topicRepository`, `transactionRepository`, `networkRepository`, and the rest of `createMirrorRepositories()`.
-- **`close()`**: releases the SDK client. The app calls it on `SIGINT`/`SIGTERM` after the server stops.
+- **`close()`**: releases the SDK client. The app calls it on `SIGINT` or `SIGTERM`, after the server stops.
 
-Express 5 forwards errors from async routes to the error-handling middleware. That middleware uses `toHttpError()` to turn `HieroError` / `MirrorError` codes into HTTP statuses (`NOT_FOUND` → 404, `TIMED_OUT` → 504, mirror failures → 502), and passes any other error on to Express's default handler.
+Express 5 passes errors from async routes to the error middleware. It uses `toHttpError()` to turn `HieroError` and `MirrorError` codes into HTTP statuses (`NOT_FOUND` → 404, `TIMED_OUT` → 504, mirror failures → 502). Other errors go to Express's default handler.

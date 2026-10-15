@@ -1,4 +1,3 @@
-import type BigNumber from "bignumber.js";
 import { Long } from "@hiero-ledger/sdk";
 import { validationError } from "../../../errors/index.js";
 import type { TokenBurnOperationOptions } from "../operations/index.js";
@@ -62,7 +61,7 @@ export class TokenBurnValidator {
             isNegative = options.amount.isNegative();
         } else {
             // BigNumber
-            isNegative = (options.amount as BigNumber).isNegative();
+            isNegative = options.amount.isNegative();
         }
 
         if (isNegative) {
@@ -117,7 +116,7 @@ export class TokenBurnValidator {
 
             const isNonPositive = isLong
                 ? serial.isNegative() || serial.isZero()
-                : (serial as number) <= 0;
+                : serial <= 0;
 
             if (isNonPositive) {
                 throw validationError(

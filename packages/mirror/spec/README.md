@@ -1,43 +1,31 @@
-# Vendored mirror node OpenAPI spec
+# Mirror node OpenAPI spec
 
-`openapi.yml` is a byte-for-byte snapshot of the official mirror node
-REST API definition:
+A byte-for-byte copy of the official mirror node REST API definition.
 
-> [`hiero-ledger/hiero-mirror-node`](https://github.com/hiero-ledger/hiero-mirror-node) → `rest/api/v1/openapi.yml`
+`openapi.yml` comes from [`hiero-ledger/hiero-mirror-node`](https://github.com/hiero-ledger/hiero-mirror-node) → `rest/api/v1/openapi.yml`. `SNAPSHOT` records the upstream commit it was copied from.
 
-`SNAPSHOT` records the upstream commit the copy was taken from.
+## Why it is here
 
-## Why it's vendored
+The package checks its coverage against this file. `test/unit/spec-coverage.test.ts` compares every operation and query parameter in it with `test/spec/coverage-manifest.ts`, in both directions, on every build. The suite fails if the spec has a parameter that is neither covered nor listed as an omission, or if the manifest lists one the spec no longer has.
 
-The snapshot is the reference the package's coverage is *proven*
-against, not just claimed: `test/unit/spec-coverage.test.ts` diffs every
-operation and query parameter in this file against
-`test/spec/coverage-manifest.ts` in both directions on every build. A
-param in the spec that is neither covered nor a documented omission
-fails the suite — and so does a manifest entry the spec no longer
-defines.
+The weekly [`spec-drift`](../../../.github/workflows/spec-drift.yml) workflow compares this copy with upstream `main` and opens an issue when they differ.
 
-The weekly [`spec-drift`](../../../.github/workflows/spec-drift.yml)
-workflow diffs this snapshot against upstream `main` and opens an issue
-when they diverge, so upstream changes surface as tickets instead of
-surprises.
+## Refresh
 
-## Refreshing the snapshot
-
-```bash
-# 1. Pull the latest spec and record its commit
+```sh
+# 1. Download the latest spec and record its commit
 curl -fsSL https://raw.githubusercontent.com/hiero-ledger/hiero-mirror-node/main/rest/api/v1/openapi.yml \
   -o packages/mirror/spec/openapi.yml
 gh api repos/hiero-ledger/hiero-mirror-node/commits/main --jq '.sha[0:7] + " " + (.commit.message | split("\n")[0])' \
   > packages/mirror/spec/SNAPSHOT
 
-# 2. See exactly what changed for the client
+# 2. See what changed for the client
 pnpm --filter @hiero-hackers/enterprise-mirror run test:unit
 ```
 
-If `spec-coverage.test.ts` fails, it prints the precise list of new or
-removed operations/parameters. For each one, either extend the client
-(query type + param mapping + URL test) and add it to `covered`, or add
-it to `omitted` with the reasoning in the manifest header. Do not edit
-the manifest to silence a failure without one of those two actions —
-the manifest is the package's coverage contract.
+If `spec-coverage.test.ts` fails, it lists the new or removed operations and parameters. For each one, either:
+
+- support it in the client (query type, parameter mapping and a URL test) and add it to `covered`, or
+- add it to `omitted`, with the reason in the manifest header.
+
+Don't edit the manifest just to silence a failure. It is the package's coverage contract.

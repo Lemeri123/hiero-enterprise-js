@@ -17,7 +17,7 @@ function isNegative(
     if (typeof value === "number") return value < 0;
     if (typeof value === "bigint") return value < 0n;
     if (Long.isLong(value)) return value.isNegative();
-    return (value as BigNumber).isNegative();
+    return value.isNegative();
 }
 
 /**
@@ -29,7 +29,7 @@ function isZero(value: number | bigint | Long | BigNumber): boolean {
     if (typeof value === "number") return value === 0;
     if (typeof value === "bigint") return value === 0n;
     if (Long.isLong(value)) return value.isZero();
-    return (value as BigNumber).isZero();
+    return value.isZero();
 }
 
 /**
@@ -41,7 +41,7 @@ function isPositive(value: number | bigint | Long | BigNumber): boolean {
     if (typeof value === "number") return value > 0;
     if (typeof value === "bigint") return value > 0n;
     if (Long.isLong(value)) return value.greaterThan(0);
-    return (value as BigNumber).isGreaterThan(0);
+    return value.isGreaterThan(0);
 }
 
 /**

@@ -1,4 +1,3 @@
-import type BigNumber from "bignumber.js";
 import { Long } from "@hiero-ledger/sdk";
 import { validationError } from "../../../errors/index.js";
 import type {
@@ -142,7 +141,7 @@ export class TokenAirdropValidator {
                 !airdrop.amount.isNegative() && !airdrop.amount.isZero();
         } else {
             // BigNumber
-            isPositive = (airdrop.amount as BigNumber).isGreaterThan(0);
+            isPositive = airdrop.amount.isGreaterThan(0);
         }
 
         if (!isPositive) {

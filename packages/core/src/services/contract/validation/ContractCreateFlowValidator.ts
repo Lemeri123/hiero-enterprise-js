@@ -1,4 +1,3 @@
-import type BigNumber from "bignumber.js";
 import { Long, Hbar } from "@hiero-ledger/sdk";
 import { validationError } from "../../../errors/index.js";
 import type { ContractCreateFlowOperationOptions } from "../operations/index.js";
@@ -91,11 +90,11 @@ export class ContractCreateFlowValidator {
         } else if (typeof value === "string") {
             isNegative = parseFloat(value) < 0;
         } else if (Long.isLong(value)) {
-            isNegative = (value as Long).isNegative();
+            isNegative = value.isNegative();
         } else if (value instanceof Hbar) {
             isNegative = value.isNegative();
         } else {
-            isNegative = (value as BigNumber).isNegative();
+            isNegative = value.isNegative();
         }
 
         if (isNegative) {

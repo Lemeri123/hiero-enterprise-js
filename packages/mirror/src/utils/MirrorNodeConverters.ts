@@ -160,7 +160,7 @@ export function convertPage<TRaw, TOut>(
         // Snapshot endpoints (/balances, /tokens/{id}/balances) report the
         // moment the figures describe at the top level — carry it through.
         ...(typeof raw.timestamp === "string" || raw.timestamp === null
-            ? { timestamp: raw.timestamp as string | null }
+            ? { timestamp: raw.timestamp }
             : {}),
     };
 }

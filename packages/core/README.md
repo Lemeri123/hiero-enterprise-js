@@ -1,83 +1,96 @@
 # @hiero-hackers/enterprise-core
 
-The write side of Hiero for Node.js: typed services over the SDK for
-transactions that go on-chain — signed by your operator account,
-carrying fees. The read side (free mirror node REST queries) lives in
-[`@hiero-hackers/enterprise-mirror`](../mirror). For an
-Express/Fastify/NestJS service, install both and wire them once at
-startup; see
-[Using with Express, Fastify, or NestJS](../../README.md#using-with-express-fastify-or-nestjs).
+Typed services for sending transactions to a Hiero network.
 
-```bash
+Each service wraps a part of the [Hiero SDK](https://github.com/hiero-ledger/hiero-sdk-js): accounts, tokens, topics, files, smart contracts, schedules and network queries. Calls are checked before they are sent, signed by your operator account, and return plain objects. For reads from the mirror node, use [`@hiero-hackers/enterprise-mirror`](../mirror).
+
+## Install
+
+```sh
 npm install @hiero-hackers/enterprise-core
 ```
 
-> **Note:** not yet published to npm — see [CONTRIBUTING](../../CONTRIBUTING.md) to run from the repo.
+## Usage
 
 ```ts
-import { HieroContext, AccountService } from "@hiero-hackers/enterprise-core";
+import {
+  AccountService,
+  AccountType,
+  HieroContext,
+  PrivateKey,
+} from "@hiero-hackers/enterprise-core";
 
 const context = new HieroContext({
-    network: "testnet",
-    operatorId: "0.0.12345",
-    operatorKey: "your_private_key_here",
-    operatorKeyType: "ed25519",
+  network: "testnet",
+  operatorId: "0.0.12345",
+  operatorKey: "<your private key>",
+  operatorKeyType: "ed25519",
 });
 
 const accounts = new AccountService(context);
-const account = await accounts.createAccount({
-    publicKey: "...",
-    initialBalance: 10,
+const key = PrivateKey.generateED25519();
+
+const { accountId } = await accounts.createAccount({
+  publicKey: key.publicKey.toStringRaw(),
+  keyType: AccountType.ED25519,
+  initialBalance: 10,
 });
 
+console.log(`created ${accountId}`);
 context.close();
 ```
 
+Every service takes the same `HieroContext`. It holds the SDK client and the operator account; `close()` releases the client's connections.
+
 ## Services
 
-| Service | What it covers |
-| --- | --- |
-| `AccountService` | Create, update, delete accounts; allowances; balances |
-| `TokenService` | Create, mint, burn, transfer fungible tokens and NFTs |
-| `TopicService` | Create topics, manage keys, submit messages |
-| `FileService` | Store and retrieve file content on-chain |
-| `ContractService` | Deploy and call EVM-compatible smart contracts |
-| `ScheduleService` | Create and sign scheduled transactions |
-| `NetworkService` | Network-level queries via the SDK client |
+| Service | Covers |
+|---|---|
+| `AccountService` | Accounts, HBAR / token / NFT transfers, allowances, balances, signature checks |
+| `TokenService` | Fungible tokens and NFTs: create, mint, burn, freeze, pause, KYC, fees, airdrops |
+| `TopicService` | Topics: create, update, delete, submit messages, subscribe |
+| `FileService` | Files: create, append, update, delete, read |
+| `ContractService` | Smart contracts: deploy, execute, update, delete, read-only calls |
+| `ScheduleService` | Scheduled transactions: sign, cancel, inspect |
+| `NetworkService` | Transaction receipts and records, network version |
 
-Every service takes the same `HieroContext`, which owns the SDK client,
-operator identity, and connection lifecycle (`close()` releases gRPC
-channels).
+Many write methods have a `schedule…` version that returns a schedule ID instead of executing, so other keys can sign it later with `ScheduleService.sign`.
 
 ## Configuration
 
-Construct `HieroContext` with a config object (as above) or with no
-arguments to read the environment: `HIERO_NETWORK`,
-`HIERO_OPERATOR_ID`, `HIERO_OPERATOR_KEY`, and `HIERO_OPERATOR_KEY_TYPE`
-(`ed25519` | `ecdsa` | `der` — required, since key algorithms cannot be
-reliably auto-detected from the raw key string).
+Pass a config object to `new HieroContext({ ... })`, or call it with no arguments to read the environment:
+
+| Variable | Config field | Notes |
+|---|---|---|
+| `HIERO_NETWORK` | `network` | `mainnet`, `testnet`, `previewnet` or a custom name |
+| `HIERO_OPERATOR_ID` | `operatorId` | The account that signs and pays |
+| `HIERO_OPERATOR_KEY` | `operatorKey` | Its private key |
+| `HIERO_OPERATOR_KEY_TYPE` | `operatorKeyType` | `ed25519`, `ecdsa` or `der`. Required: a raw key doesn't say which algorithm it uses |
+| `HIERO_NETWORK_NODES` | `networkNodes` | Custom networks only |
+| `HIERO_MIRROR_NETWORK` | `mirrorNetwork` | Custom networks only |
+| `HIERO_MIRROR_NODE_URL` | `mirrorNodeUrl` | Custom networks only |
+| `HIERO_REQUEST_TIMEOUT_MS` | `requestTimeoutMs` | Optional. Default 120000 |
+| `HIERO_GRPC_DEADLINE_MS` | `grpcDeadlineMs` | Optional. Default 10000 |
+| `HIERO_MAX_ATTEMPTS` | `maxAttempts` | Optional. Default 10 |
+| `HIERO_MIN_BACKOFF_MS` | `minBackoffMs` | Optional. Default 250 |
+| `HIERO_MAX_BACKOFF_MS` | `maxBackoffMs` | Optional. Default 8000 |
+
+A numeric variable that is not a positive number throws a `CONFIG_INVALID` error. `context.config` is a copy with the key replaced by `"[redacted]"`, so it is safe to log.
 
 ## Balances
 
-Balances are read from the mirror node, as the consensus nodes no longer
-serve balance queries:
+Balances come from the mirror node, because consensus nodes no longer answer balance queries:
 
 ```ts
-const accounts = new AccountService(context);
 const { tinybars } = await accounts.getAccountBalance("0.0.1234");
-const { balance, decimals } = await accounts.getTokenBalance(
-  "0.0.1234",
-  "0.0.5678",
-);
+const { balance, decimals } = await accounts.getTokenBalance("0.0.1234", "0.0.5678");
 ```
 
-A new account or transfer appears on the mirror node a few seconds after
-it reaches consensus.
+A new account or transfer shows up a few seconds after it reaches consensus.
 
 ## Custom networks
 
-For a network other than mainnet, testnet or previewnet (for example a
-local Solo network), pass its consensus nodes and its mirror node:
+For a network other than mainnet, testnet or previewnet, such as a local [Solo](https://github.com/hiero-ledger/solo) network, give it the consensus nodes and the mirror node:
 
 ```ts
 const context = new HieroContext({
@@ -91,16 +104,20 @@ const context = new HieroContext({
 });
 ```
 
-- `networkNodes` (`HIERO_NETWORK_NODES="127.0.0.1:50211=0.0.3"`): the
-  consensus nodes.
-- `mirrorNetwork` (`HIERO_MIRROR_NETWORK="localhost:5600"`): the mirror
-  node's gRPC address, needed for balances and topic subscriptions.
-- `mirrorNodeUrl` (`HIERO_MIRROR_NODE_URL="http://localhost:5551"`): the
-  mirror node's REST URL, which balances are read from. Without it the SDK
-  uses port 5551 for a local mirror node, so set it when yours serves REST
-  elsewhere (Solo's default is 38081).
+- `networkNodes`: the consensus nodes, as `"host:port": "accountId"`. In the environment: `HIERO_NETWORK_NODES="127.0.0.1:50211=0.0.3"`.
+- `mirrorNetwork`: the mirror node's gRPC address, used for topic subscriptions and balances. In the environment: `HIERO_MIRROR_NETWORK="localhost:5600"`.
+- `mirrorNodeUrl`: the mirror node's REST URL, which balances are read from. Without it the SDK uses port 5551 for a local mirror node; Solo serves REST on 38081.
 
 See [`custom-network.ts`](../../samples/examples/src/network/custom-network.ts).
 
-Runnable examples for every service:
-[`samples/examples`](../../samples/examples).
+## Errors
+
+Every error is a `HieroError` with a `code`: `INPUT_INVALID`, `CONFIG_INVALID`, `NOT_FOUND`, `TIMED_OUT`, `SDK_ERROR`, `RESULT_MAPPING_FAILED` or `UNKNOWN`. Errors from a transaction also carry its `transactionId`. See [Errors](../../README.md#errors) for an example.
+
+## Examples
+
+[`samples/examples`](../../samples/examples) has a runnable script for every service.
+
+## License
+
+Apache-2.0 — see [LICENSE](../../LICENSE)

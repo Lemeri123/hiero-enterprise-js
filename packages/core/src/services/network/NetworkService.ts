@@ -10,6 +10,7 @@ import {
     TransactionRecordQuery,
 } from "@hiero-ledger/sdk";
 import type { IHieroContext } from "../../context/index.js";
+import { validationError } from "../../errors/index.js";
 import type { QueryOptions } from "../transaction/index.js";
 import { QueryExecutor } from "../transaction/index.js";
 
@@ -44,6 +45,37 @@ export interface GetTransactionReceiptOptions extends QueryOptions {
  * {@link GetTransactionReceiptOptions}).
  */
 export type GetTransactionRecordOptions = GetTransactionReceiptOptions;
+
+/**
+ * Resolve a caller-supplied transaction ID before any query is built.
+ *
+ * The SDK's `TransactionId.fromString` throws a raw `TypeError` for
+ * malformed strings (e.g. `"abc"`), so string input is parsed here and
+ * rejected as `INPUT_INVALID`, like the other input validators.
+ *
+ * @param transactionId - String or `TransactionId` from the options
+ * @param context - The `NetworkService` method validating the input
+ * @returns The parsed `TransactionId`
+ */
+function parseTransactionId(
+    transactionId: string | TransactionId,
+    context: string,
+): TransactionId {
+    if (transactionId == null) {
+        throw validationError(context, "transactionId is required.");
+    }
+    if (typeof transactionId !== "string") {
+        return transactionId;
+    }
+    try {
+        return TransactionId.fromString(transactionId);
+    } catch {
+        throw validationError(
+            context,
+            `transactionId "${transactionId}" is not a valid transaction ID. Expected "<shard>.<realm>.<num>@<seconds>.<nanos>".`,
+        );
+    }
+}
 
 /**
  * Public facade for cross-cutting consensus-node queries:
@@ -89,10 +121,10 @@ export class NetworkService {
     async getTransactionReceipt(
         options: GetTransactionReceiptOptions,
     ): Promise<TransactionReceipt> {
-        const txId =
-            typeof options.transactionId === "string"
-                ? TransactionId.fromString(options.transactionId)
-                : options.transactionId;
+        const txId = parseTransactionId(
+            options.transactionId,
+            "NetworkService.getTransactionReceipt",
+        );
 
         const query = new TransactionReceiptQuery().setTransactionId(txId);
 
@@ -130,10 +162,10 @@ export class NetworkService {
     async getTransactionRecord(
         options: GetTransactionRecordOptions,
     ): Promise<TransactionRecord> {
-        const txId =
-            typeof options.transactionId === "string"
-                ? TransactionId.fromString(options.transactionId)
-                : options.transactionId;
+        const txId = parseTransactionId(
+            options.transactionId,
+            "NetworkService.getTransactionRecord",
+        );
 
         const query = new TransactionRecordQuery().setTransactionId(txId);
 
