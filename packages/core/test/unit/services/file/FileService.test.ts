@@ -4,7 +4,7 @@ import { HieroError, HieroErrorCodes } from "../../../../src/errors/index.js";
 import { createMockContext } from "../../../utils/mock-context.js";
 import type { IHieroContext } from "../../../../src/context/index.js";
 
-describe("FileService [partial content failure]", () => {
+describe("FileService", () => {
     let context: IHieroContext;
     let service: FileService;
 
@@ -153,6 +153,89 @@ describe("FileService [partial content failure]", () => {
             await service.updateFile({ fileId, fileMemo: "updated memo" });
 
             expect(appendSpy).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("content splitting", () => {
+        const fileId = { toString: () => "0.0.12347" };
+
+        it("sends exactly 4096 bytes in the create without an append", async () => {
+            const contents = Buffer.alloc(4096, "a");
+            const create = vi
+                .spyOn(service["createOperation"], "execute")
+                .mockResolvedValueOnce({ fileId } as never);
+            const append = vi.spyOn(service["appendOperation"], "execute");
+
+            await service.createFile({ contents });
+
+            expect(create.mock.calls[0][0].contents).toBe(contents);
+            expect(append).not.toHaveBeenCalled();
+        });
+
+        it("appends the remainder of 4097 bytes after the create", async () => {
+            const contents = Buffer.alloc(4097, "b");
+            const create = vi
+                .spyOn(service["createOperation"], "execute")
+                .mockResolvedValueOnce({ fileId } as never);
+            const append = vi
+                .spyOn(service["appendOperation"], "execute")
+                .mockResolvedValueOnce({} as never);
+
+            await service.createFile({ contents });
+
+            const head = create.mock.calls[0][0].contents as Uint8Array;
+            const appended = append.mock.calls[0][0];
+            expect(head.byteLength).toBe(4096);
+            expect(appended.fileId).toBe(fileId);
+            expect((appended.contents as Uint8Array).byteLength).toBe(1);
+        });
+
+        it("splits a string by its UTF-8 byte length", async () => {
+            // 2049 two-byte characters: 4098 bytes
+            const contents = "é".repeat(2049);
+            const update = vi
+                .spyOn(service["updateOperation"], "execute")
+                .mockResolvedValueOnce({} as never);
+            const append = vi
+                .spyOn(service["appendOperation"], "execute")
+                .mockResolvedValueOnce({} as never);
+
+            await service.updateFile({ fileId: "0.0.12347", contents });
+
+            const head = update.mock.calls[0][0].contents as Uint8Array;
+            const tail = append.mock.calls[0][0].contents as Uint8Array;
+            expect(head.byteLength).toBe(4096);
+            expect(tail.byteLength).toBe(2);
+            expect(Buffer.concat([head, tail]).toString("utf8")).toBe(contents);
+        });
+    });
+
+    describe("scheduleUpdateFile", () => {
+        it("schedules contents that fit in one transaction", async () => {
+            const contents = Buffer.alloc(4096, "c");
+            const schedule = vi
+                .spyOn(service["updateOperation"], "schedule")
+                .mockResolvedValueOnce({} as never);
+
+            await service.scheduleUpdateFile({ fileId: "0.0.12348", contents });
+
+            expect(schedule.mock.calls[0][0].contents).toBe(contents);
+        });
+
+        it("rejects contents larger than one transaction before scheduling", async () => {
+            const schedule = vi.spyOn(service["updateOperation"], "schedule");
+
+            await expect(
+                service.scheduleUpdateFile({
+                    fileId: "0.0.12348",
+                    contents: Buffer.alloc(4097, "c"),
+                }),
+            ).rejects.toMatchObject({
+                name: "HieroError",
+                code: HieroErrorCodes.InputInvalid,
+                context: "FileService.scheduleUpdateFile",
+            });
+            expect(schedule).not.toHaveBeenCalled();
         });
     });
 
