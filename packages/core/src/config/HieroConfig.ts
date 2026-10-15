@@ -45,6 +45,8 @@ export interface HieroConfig {
     readonly maxBackoffMs?: number;
 }
 
+const OPERATOR_KEY_TYPES = ["ed25519", "ecdsa", "der"];
+
 /**
  * Resolve a HieroConfig from environment variables.
  *
@@ -62,26 +64,44 @@ export interface HieroConfig {
  *   HIERO_MIN_BACKOFF_MS
  *   HIERO_MAX_BACKOFF_MS
  *
- * @returns A HieroConfig or null if required env vars are missing
- * @throws {HieroError} `CONFIG_INVALID` if a numeric variable is not a
- *   positive number
+ * @returns The resolved HieroConfig
+ * @throws {HieroError} `CONFIG_INVALID` if a required variable is missing,
+ *   `HIERO_OPERATOR_KEY_TYPE` is not a known key type, a
+ *   `HIERO_NETWORK_NODES` entry is malformed, or a numeric variable is not
+ *   a positive number
  */
-export function resolveConfigFromEnv(): HieroConfig | null {
+export function resolveConfigFromEnv(): HieroConfig {
     const network = process.env["HIERO_NETWORK"];
     const operatorId = process.env["HIERO_OPERATOR_ID"];
     const operatorKey = process.env["HIERO_OPERATOR_KEY"];
-    const operatorKeyTypeRaw =
-        process.env["HIERO_OPERATOR_KEY_TYPE"]?.toLowerCase();
     const operatorKeyType =
-        operatorKeyTypeRaw === "ed25519" ||
-        operatorKeyTypeRaw === "ecdsa" ||
-        operatorKeyTypeRaw === "der"
-            ? operatorKeyTypeRaw
-            : undefined;
+        process.env["HIERO_OPERATOR_KEY_TYPE"]?.toLowerCase();
     const networkNodesRaw = process.env["HIERO_NETWORK_NODES"];
 
     if (!network || !operatorId || !operatorKey || !operatorKeyType) {
-        return null;
+        const missing = [];
+        if (!network)
+            missing.push(
+                "HIERO_NETWORK (e.g., 'testnet', 'mainnet', 'previewnet')",
+            );
+        if (!operatorId) missing.push("HIERO_OPERATOR_ID (e.g., '0.0.12345')");
+        if (!operatorKey) missing.push("HIERO_OPERATOR_KEY (your private key)");
+        if (!operatorKeyType)
+            missing.push(
+                "HIERO_OPERATOR_KEY_TYPE (one of: 'ed25519', 'ecdsa', 'der')",
+            );
+        throw new HieroError(
+            `Missing required Hiero environment variables:\n  - ${missing.join("\n  - ")}\n\n` +
+                `Set them in your process environment before application startup.`,
+            { code: HieroErrorCodes.ConfigInvalid },
+        );
+    }
+
+    if (!OPERATOR_KEY_TYPES.includes(operatorKeyType)) {
+        throw new HieroError(
+            `HIERO_OPERATOR_KEY_TYPE must be one of 'ed25519', 'ecdsa', 'der', got "${operatorKeyType}".`,
+            { code: HieroErrorCodes.ConfigInvalid },
+        );
     }
 
     // Parse HIERO_NETWORK_NODES: "host:port=accountId,host:port=accountId"
@@ -89,10 +109,16 @@ export function resolveConfigFromEnv(): HieroConfig | null {
     if (networkNodesRaw) {
         const parsed = new Map<string, string>();
         for (const entry of networkNodesRaw.split(",")) {
-            const [address, accountId] = entry.trim().split("=");
-            if (address && accountId) {
-                parsed.set(address, accountId);
+            const trimmed = entry.trim();
+            if (!trimmed) continue;
+            const [address, accountId] = trimmed.split("=");
+            if (!address || !accountId) {
+                throw new HieroError(
+                    `HIERO_NETWORK_NODES entry "${trimmed}" is malformed. Expected "host:port=accountId".`,
+                    { code: HieroErrorCodes.ConfigInvalid },
+                );
             }
+            parsed.set(address, accountId);
         }
         networkNodes = Object.fromEntries(parsed);
     }
@@ -156,31 +182,9 @@ function positiveNumberFromEnv(
 }
 
 /**
- * Validates the environment and throws a HieroError explaining exactly what is missing.
+ * Validates the environment and throws a HieroError explaining exactly what
+ * is missing or invalid.
  */
 export function assertEnvConfigValid(): void {
-    const network = process.env["HIERO_NETWORK"];
-    const operatorId = process.env["HIERO_OPERATOR_ID"];
-    const operatorKey = process.env["HIERO_OPERATOR_KEY"];
-    const operatorKeyType = process.env["HIERO_OPERATOR_KEY_TYPE"];
-
-    const missing = [];
-    if (!network)
-        missing.push(
-            "HIERO_NETWORK (e.g., 'testnet', 'mainnet', 'previewnet')",
-        );
-    if (!operatorId) missing.push("HIERO_OPERATOR_ID (e.g., '0.0.12345')");
-    if (!operatorKey) missing.push("HIERO_OPERATOR_KEY (your private key)");
-    if (!operatorKeyType)
-        missing.push(
-            "HIERO_OPERATOR_KEY_TYPE (one of: 'ed25519', 'ecdsa', 'der')",
-        );
-
-    if (missing.length > 0) {
-        throw new HieroError(
-            `Missing required Hiero environment variables:\n  - ${missing.join("\n  - ")}\n\n` +
-                `Set them in your process environment before application startup.`,
-            { code: HieroErrorCodes.ConfigInvalid },
-        );
-    }
+    resolveConfigFromEnv();
 }

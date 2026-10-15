@@ -68,9 +68,6 @@ describe("HieroContext", () => {
         });
 
         it("resolves from environment variables if no config provided", () => {
-            vi.spyOn(configModule, "assertEnvConfigValid").mockImplementation(
-                () => {},
-            );
             vi.spyOn(configModule, "resolveConfigFromEnv").mockReturnValue(
                 validConfig,
             );
@@ -81,8 +78,27 @@ describe("HieroContext", () => {
                 ...validConfig,
                 operatorKey: "[redacted]",
             });
-            expect(configModule.assertEnvConfigValid).toHaveBeenCalled();
             expect(configModule.resolveConfigFromEnv).toHaveBeenCalled();
+        });
+
+        it("throws CONFIG_INVALID for an unknown HIERO_OPERATOR_KEY_TYPE", () => {
+            const env = process.env;
+            process.env = {
+                HIERO_NETWORK: "testnet",
+                HIERO_OPERATOR_ID: "0.0.2",
+                HIERO_OPERATOR_KEY: "abc",
+                HIERO_OPERATOR_KEY_TYPE: "rsa",
+            };
+            try {
+                expect(() => create()).toThrow(
+                    expect.objectContaining({
+                        code: HieroErrorCodes.ConfigInvalid,
+                        message: expect.stringContaining('"rsa"'),
+                    }),
+                );
+            } finally {
+                process.env = env;
+            }
         });
     });
 
