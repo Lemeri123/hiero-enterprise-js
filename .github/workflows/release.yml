@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Publishes the @hiero-hackers/* packages to the GitHub Packages npm registry
-# (npm.pkg.github.com) on a version tag. Publishing authenticates with the
+# (npm.pkg.github.com) when a version bump lands on main. Publishing authenticates with the
 # workflow's own GITHUB_TOKEN (`packages: write`) — no npm account and no
 # long-lived secret anywhere. (npm provenance is an npmjs.org-only feature,
 # so it is not attached here; the registry itself links every version to
@@ -16,31 +16,37 @@
 # publishes in dependency order. Re-running after a version already exists
 # fails cleanly, so there is no double-publish.
 #
-# After a successful publish the workflow also cuts a GitHub Release for the
-# tag, so the Releases tab reflects what is actually on the registry — a bare
-# tag leaves no trace on the repo's front page.
+# Releases run from `main`: when a merge changes the root package.json
+# version and no `v<version>` tag exists yet, this workflow publishes the
+# packages, tags the merged commit and opens a draft GitHub Release with the
+# CHANGELOG section for that version. Review the draft and publish it.
 #
 # To release: bump the version across the whole workspace (root + every
-# packages/* — keep them in lockstep), merge to main, then push a matching tag:
-#   git tag -s v0.3.0 && git push origin v0.3.0
-# The tag push triggers this workflow. `workflow_dispatch` is a manual fallback
-# (it skips the tag/version guards and does not cut a Release).
+# packages/* — keep them in lockstep), date the CHANGELOG section and merge
+# the release PR. Nothing to tag by hand. `workflow_dispatch` re-runs the
+# same steps on `main`, e.g. after a failed publish.
 name: Release
 
 on:
     push:
-        tags: ["v*.*.*"]
+        branches: [main]
+        paths: [package.json]
     workflow_dispatch:
 
 permissions:
     contents: read
 
+concurrency:
+    group: release
+    cancel-in-progress: false
+
 jobs:
     publish:
         name: Publish to GitHub Packages
+        if: github.ref == 'refs/heads/main'
         runs-on: ubuntu-latest
         permissions:
-            contents: write # cut the GitHub Release for the tag
+            contents: write # push the tag and create the draft Release
             packages: write # publish to npm.pkg.github.com with GITHUB_TOKEN
         steps:
             - name: Harden Runner
@@ -52,10 +58,27 @@ jobs:
               with:
                   persist-credentials: false
 
+            # A version that already has a tag was released before, so a
+            # package.json change without a bump publishes nothing.
+            - name: Resolve version
+              id: version
+              run: |
+                  version=$(node -p "require('./package.json').version")
+                  echo "version=$version" >> "$GITHUB_OUTPUT"
+                  if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
+                      echo "v$version is already tagged — nothing to release"
+                      echo "release=false" >> "$GITHUB_OUTPUT"
+                  else
+                      echo "releasing $version"
+                      echo "release=true" >> "$GITHUB_OUTPUT"
+                  fi
+
             - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+              if: steps.version.outputs.release == 'true'
               # version comes from package.json "packageManager"
 
             - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+              if: steps.version.outputs.release == 'true'
               with:
                   node-version: "22"
                   registry-url: "https://npm.pkg.github.com"
@@ -63,24 +86,12 @@ jobs:
                   cache: pnpm
 
             - run: pnpm install --frozen-lockfile
-
-            # A tag must match the workspace version — otherwise a mistaken tag
-            # would publish the wrong version. (Skipped on manual runs.)
-            - name: Tag matches workspace version
-              if: startsWith(github.ref, 'refs/tags/')
-              run: |
-                  root=$(node -p "require('./package.json').version")
-                  tag="${GITHUB_REF_NAME#v}"
-                  if [ "$root" != "$tag" ]; then
-                      echo "::error::tag v$tag does not match workspace version $root"
-                      exit 1
-                  fi
-                  echo "publishing $root"
+              if: steps.version.outputs.release == 'true'
 
             # Every publishable package must carry that same version — guards
             # against a half-bumped workspace publishing mixed versions.
             - name: Packages share the workspace version
-              if: startsWith(github.ref, 'refs/tags/')
+              if: steps.version.outputs.release == 'true'
               run: |
                   root=$(node -p "require('./package.json').version")
                   for p in packages/*/; do
@@ -96,40 +107,52 @@ jobs:
 
             # dist/ must exist before publish (each package ships `files: [dist]`).
             - name: Build
+              if: steps.version.outputs.release == 'true'
               run: pnpm -r run build
 
             - name: Publish
+              if: steps.version.outputs.release == 'true'
               run: pnpm -r publish --no-git-checks
               env:
                   NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-            # A tag alone is invisible on the repo's front page — the Releases
-            # tab stays empty and there is nowhere to point consumers at. Cut
-            # the Release only after the publish above succeeded, so a Release
-            # never advertises versions that are not on the registry. Re-running
-            # is safe: an existing Release for the tag is left alone.
-            - name: Create GitHub Release
-              if: startsWith(github.ref, 'refs/tags/')
+            # Tag only after the publish succeeded, so a tag never points at
+            # versions that are not on the registry.
+            - name: Tag the release commit
+              if: steps.version.outputs.release == 'true'
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  TAG: v${{ steps.version.outputs.version }}
               run: |
-                  if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-                      echo "release $GITHUB_REF_NAME already exists — leaving it as is"
-                      exit 0
-                  fi
-                  version="${GITHUB_REF_NAME#v}"
+                  gh api "repos/$GITHUB_REPOSITORY/git/refs" \
+                      -f ref="refs/tags/$TAG" -f sha="$GITHUB_SHA"
+
+            # A draft, so the notes can be reviewed before the Release goes
+            # public. The CHANGELOG section for the version is the body.
+            - name: Create draft GitHub Release
+              if: steps.version.outputs.release == 'true'
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  VERSION: ${{ steps.version.outputs.version }}
+              run: |
+                  awk -v heading="## [$VERSION]" '
+                      index($0, heading) == 1 { found = 1; next }
+                      found && /^## \[/ { exit }
+                      found { print }
+                  ' CHANGELOG.md > /tmp/changelog.md
                   # Heredoc rather than --notes: the body is markdown, and any
                   # stray leading indentation would render as a code block.
                   cat > /tmp/release-notes.md <<EOF
-                  Published to the [GitHub Packages npm registry](https://github.com/orgs/hiero-hackers/packages?repo_name=hiero-enterprise-js) at \`$version\`:
+                  Published to the [GitHub Packages npm registry](https://github.com/orgs/hiero-hackers/packages?repo_name=hiero-enterprise-js) at \`$VERSION\`:
 
                   - \`@hiero-hackers/enterprise-core\`
                   - \`@hiero-hackers/enterprise-mirror\`
 
                   Installing requires a GitHub token with \`read:packages\` — see [CONTRIBUTING](https://github.com/hiero-hackers/hiero-enterprise-js/blob/main/CONTRIBUTING.md#installing-the-published-packages).
                   EOF
-                  gh release create "$GITHUB_REF_NAME" \
+                  cat /tmp/changelog.md >> /tmp/release-notes.md
+                  gh release create "v$VERSION" \
+                      --draft \
                       --verify-tag \
-                      --title "$GITHUB_REF_NAME" \
-                      --notes-file /tmp/release-notes.md \
-                      --generate-notes
+                      --title "v$VERSION" \
+                      --notes-file /tmp/release-notes.md
