@@ -27,6 +27,15 @@ const versionInfo = {
     servicesVersion: { major: 0, minor: 50, patch: 1 },
 } as unknown as NetworkVersionInfo;
 
+/** Malformed string IDs the SDK parser rejects with a raw TypeError/Error. */
+const malformedIds = [
+    "abc",
+    "",
+    "0.0.123",
+    "0.0.123@1700000000",
+    "not-an-account@1700000000.000000000",
+];
+
 describe("NetworkService [facade contract]", () => {
     let context: IHieroContext;
     let service: NetworkService;
@@ -112,6 +121,37 @@ describe("NetworkService [facade contract]", () => {
                 }),
             );
         });
+
+        it.each(malformedIds)(
+            "rejects malformed transactionId %j with INPUT_INVALID before querying",
+            async (transactionId) => {
+                await expect(
+                    service.getTransactionReceipt({ transactionId }),
+                ).rejects.toMatchObject({
+                    name: "HieroError",
+                    code: "INPUT_INVALID",
+                    context: "NetworkService.getTransactionReceipt",
+                    message: expect.stringContaining(
+                        `transactionId "${transactionId}" is not a valid transaction ID`,
+                    ),
+                });
+                expect(execute).not.toHaveBeenCalled();
+                expect(context.emitBeforeTransaction).not.toHaveBeenCalled();
+            },
+        );
+
+        it("rejects a missing transactionId with INPUT_INVALID before querying", async () => {
+            await expect(
+                service.getTransactionReceipt({
+                    transactionId: undefined as unknown as string,
+                }),
+            ).rejects.toMatchObject({
+                code: "INPUT_INVALID",
+                context: "NetworkService.getTransactionReceipt",
+                message: "transactionId is required.",
+            });
+            expect(execute).not.toHaveBeenCalled();
+        });
     });
 
     describe("getTransactionRecord", () => {
@@ -188,6 +228,37 @@ describe("NetworkService [facade contract]", () => {
                     methodName: "getTransactionRecord",
                 }),
             );
+        });
+
+        it.each(malformedIds)(
+            "rejects malformed transactionId %j with INPUT_INVALID before querying",
+            async (transactionId) => {
+                await expect(
+                    service.getTransactionRecord({ transactionId }),
+                ).rejects.toMatchObject({
+                    name: "HieroError",
+                    code: "INPUT_INVALID",
+                    context: "NetworkService.getTransactionRecord",
+                    message: expect.stringContaining(
+                        `transactionId "${transactionId}" is not a valid transaction ID`,
+                    ),
+                });
+                expect(execute).not.toHaveBeenCalled();
+                expect(context.emitBeforeTransaction).not.toHaveBeenCalled();
+            },
+        );
+
+        it("rejects a missing transactionId with INPUT_INVALID before querying", async () => {
+            await expect(
+                service.getTransactionRecord({
+                    transactionId: undefined as unknown as string,
+                }),
+            ).rejects.toMatchObject({
+                code: "INPUT_INVALID",
+                context: "NetworkService.getTransactionRecord",
+                message: "transactionId is required.",
+            });
+            expect(execute).not.toHaveBeenCalled();
         });
     });
 
