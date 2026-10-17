@@ -10,6 +10,7 @@ Only changes that users of the published packages would notice are recorded. Tes
 
 ### Added
 
+- Added `TransactionRepository.findAllById` and `MirrorNodeClient.queryTransactionRows`, which return every row the mirror node sends for a transaction ID: parent and child transactions, or a `SCHEDULECREATE` and its scheduled execution. `findById` / `queryTransaction` returned only the first row, so the scheduled execution and child transactions were unreachable. `findById` still returns the first row. Applies to `@hiero-hackers/enterprise-mirror`. [#203](https://github.com/hiero-hackers/hiero-enterprise-js/issues/203) [#326](https://github.com/hiero-hackers/hiero-enterprise-js/pull/326)
 - Added `MirrorError.detail`, the mirror node's own diagnostic from an HTTP error body (`_status.messages[0]`, as `"message (detail)"`), so callers can show it — for example `CONTRACT_REVERT_EXECUTED (0x08c379a0…)` from a failed `contracts/call` — without splitting `message` at its `" — "` separator. It is `undefined` when the body carries no diagnostic; `message` is unchanged. Applies to `@hiero-hackers/enterprise-mirror`. [#209](https://github.com/hiero-hackers/hiero-enterprise-js/issues/209) [#325](https://github.com/hiero-hackers/hiero-enterprise-js/pull/325)
 
 ### Fixed
