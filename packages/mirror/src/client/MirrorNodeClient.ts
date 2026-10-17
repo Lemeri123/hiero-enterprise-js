@@ -158,7 +158,11 @@ import type {
     MirrorClientObserver,
     RequestTelemetry,
 } from "./MirrorClientObserver.js";
-import { appendQuery, segment } from "../utils/MirrorNodeQuery.js";
+import {
+    appendQuery,
+    segment,
+    transactionIdSegment,
+} from "../utils/MirrorNodeQuery.js";
 import { parseLossless } from "../utils/LosslessJson.js";
 
 /** Default per-request timeout, in milliseconds. */
@@ -1002,7 +1006,7 @@ export class MirrorNodeClient {
         transactionId: string,
         options?: TransactionLookupQuery,
     ): Promise<TransactionInfo[]> {
-        const path = `/api/v1/transactions/${segment(transactionId)}`;
+        const path = `/api/v1/transactions/${transactionIdSegment(transactionId)}`;
         const raw = await this.request<MirrorTransactionListResponse>(
             appendQuery(path, {
                 nonce: options?.nonce,
@@ -1476,7 +1480,7 @@ export class MirrorNodeClient {
         options?: ContractResultQuery,
     ): Promise<ContractResultDetails> {
         const path = appendQuery(
-            `/api/v1/contracts/results/${segment(transactionIdOrHash)}`,
+            `/api/v1/contracts/results/${transactionIdSegment(transactionIdOrHash)}`,
             { nonce: options?.nonce },
         );
         const raw = await this.request<MirrorContractResultDetails>(path);
@@ -1491,7 +1495,7 @@ export class MirrorNodeClient {
     ): Promise<Page<ContractAction>> {
         return this.getPage(
             appendQuery(
-                `/api/v1/contracts/results/${segment(transactionIdOrHash)}/actions`,
+                `/api/v1/contracts/results/${transactionIdSegment(transactionIdOrHash)}/actions`,
                 {
                     index: options?.index,
                     limit: options?.limit,
@@ -1512,7 +1516,7 @@ export class MirrorNodeClient {
         options?: OpcodesQuery,
     ): Promise<OpcodeTrace> {
         const path = appendQuery(
-            `/api/v1/contracts/results/${segment(transactionIdOrHash)}/opcodes`,
+            `/api/v1/contracts/results/${transactionIdSegment(transactionIdOrHash)}/opcodes`,
             {
                 stack: options?.stack,
                 memory: options?.memory,
