@@ -15,6 +15,7 @@ Only changes that users of the published packages would notice are recorded. Tes
 
 ### Changed
 
+- **Behavior change:** the mirror client honours `Retry-After` only up to 5 seconds. A `429` or 5xx whose `Retry-After` asks for longer now ends the request with that response's error instead of sleeping: a request with `timeoutMs: 500` used to take 5 s on `Retry-After: 5`, and `Retry-After: 60` held a concurrency slot for about 3 minutes across the default retries. Shorter `Retry-After` values are honoured as before. Applies to `@hiero-hackers/enterprise-mirror`. [#338](https://github.com/hiero-hackers/hiero-enterprise-js/issues/338) [#347](https://github.com/hiero-hackers/hiero-enterprise-js/pull/347)
 - **Behavior change:** `MirrorNodeClient` (and `createMirrorNodeClient` / `HIERO_MIRROR_NODE_URL`) now throws a `CONFIG_INVALID` `MirrorError` for a base URL ending in `/api/v1` (with or without a trailing slash), naming the URL to use instead. Every request path already starts with `/api/v1`, so such a URL requested `/api/v1/api/v1/…`, got a 404 and reported every lookup as `NOT_FOUND` (or `null` through `orNull`). Applies to `@hiero-hackers/enterprise-mirror`. [#337](https://github.com/hiero-hackers/hiero-enterprise-js/issues/337) [#346](https://github.com/hiero-hackers/hiero-enterprise-js/pull/346)
 
 ### Fixed
