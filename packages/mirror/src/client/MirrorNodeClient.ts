@@ -714,7 +714,7 @@ export class MirrorNodeClient {
         });
         const raw = await this.request<MirrorAccountResponse>(path);
         assertAccountResponse(raw, path);
-        return convertBalance(accountId, raw);
+        return convertBalance(raw);
     }
 
     /**
