@@ -8,6 +8,10 @@ Only changes that users of the published packages would notice are recorded. Tes
 
 ## [Unreleased](https://github.com/hiero-hackers/hiero-enterprise-js/compare/v0.4.0...HEAD)
 
+### Added
+
+- Added `MirrorError.detail`, the mirror node's own diagnostic from an HTTP error body (`_status.messages[0]`, as `"message (detail)"`), so callers can show it — for example `CONTRACT_REVERT_EXECUTED (0x08c379a0…)` from a failed `contracts/call` — without splitting `message` at its `" — "` separator. It is `undefined` when the body carries no diagnostic; `message` is unchanged. Applies to `@hiero-hackers/enterprise-mirror`. [#209](https://github.com/hiero-hackers/hiero-enterprise-js/issues/209) [#325](https://github.com/hiero-hackers/hiero-enterprise-js/pull/325)
+
 ### Fixed
 
 - **Behavior change:** fixed the registered-node endpoint role fields being typed `boolean`: `blockNode`, `generalService`, `mirrorNode` and `rpcRelay` on `RegisteredServiceEndpoint` (and `block_node`, `general_service`, `mirror_node`, `rpc_relay` on `MirrorRegisteredServiceEndpoint`) hold the role's details or `null`, as the mirror node sends them, so `if (endpoint.blockNode)` was an object-truthiness test and the role details were unreachable without a cast. `blockNode` is now `{ endpointApis }` and `generalService` is `{ description }`. The top-level `endpointApis` and `description` fields, which the mirror node never sends and were always `undefined`, are removed; read them from `blockNode` and `generalService`. Applies to `@hiero-hackers/enterprise-mirror`. [#208](https://github.com/hiero-hackers/hiero-enterprise-js/issues/208) [#324](https://github.com/hiero-hackers/hiero-enterprise-js/pull/324)
