@@ -12,6 +12,15 @@
  * dissociation, the account can no longer receive the token unless
  * re-associated.
  *
+ * Setup: the client is built from environment variables by
+ * `resolveConfigFromEnv()` from `@hiero-hackers/enterprise-core`:
+ *   HIERO_NETWORK            testnet, mainnet, previewnet, or a custom name
+ *   HIERO_OPERATOR_ID        account that pays the fees, e.g. 0.0.12345
+ *   HIERO_OPERATOR_KEY       the operator's private key
+ *   HIERO_OPERATOR_KEY_TYPE  ed25519, ecdsa or der
+ * For a custom network such as local Solo, also set HIERO_NETWORK_NODES,
+ * HIERO_MIRROR_NETWORK and HIERO_MIRROR_NODE_URL.
+ *
  * Run: pnpm tsx src/token/dissociate-token.ts
  */
 
@@ -21,8 +30,8 @@ import {
     HieroContext,
     PrivateKey,
     TokenService,
+    resolveConfigFromEnv,
 } from "@hiero-hackers/enterprise-core";
-import { getED25519Config } from "../env.js";
 
 async function dissociateToken(
     accountService: AccountService,
@@ -145,7 +154,8 @@ async function scheduleDissociateToken(
 }
 
 async function main() {
-    const context = new HieroContext(getED25519Config());
+    // Read the network and operator from the HIERO_* environment variables.
+    const context = new HieroContext(resolveConfigFromEnv());
     const accountService = new AccountService(context);
     const tokenService = new TokenService(context);
 
