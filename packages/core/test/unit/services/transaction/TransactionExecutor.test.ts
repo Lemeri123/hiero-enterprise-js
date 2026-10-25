@@ -176,6 +176,151 @@ describe("TransactionExecutor", () => {
         });
     });
 
+    describe("run() — transactionId", () => {
+        const FIXED_ID = "0.0.5@1700000000.000000123";
+
+        it("submits under a full transaction ID string", async () => {
+            await executor.run(tx, { transactionId: FIXED_ID }, SAMPLE_EVENT);
+
+            expect(executedTx().transactionId?.toString()).toBe(FIXED_ID);
+        });
+
+        it("submits under a TransactionId instance", async () => {
+            const id = TransactionId.fromString(FIXED_ID);
+
+            await executor.run(tx, { transactionId: id }, SAMPLE_EVENT);
+
+            expect(executedTx().transactionId).toBe(id);
+        });
+
+        it("generates a valid start for a bare payer account ID", async () => {
+            const before = Date.now();
+
+            await executor.run(tx, { transactionId: "0.0.5" }, SAMPLE_EVENT);
+
+            const id = executedTx().transactionId!;
+            expect(id.accountId?.toString()).toBe("0.0.5");
+            // TransactionId.generate backdates the valid start by a few seconds.
+            const validStartMs = id.validStart!.toDate().getTime();
+            expect(validStartMs).toBeGreaterThan(before - 60_000);
+            expect(validStartMs).toBeLessThanOrEqual(Date.now());
+        });
+
+        it("defaults to an operator-generated ID without one", async () => {
+            await executor.run(tx, {}, SAMPLE_EVENT);
+
+            expect(executedTx().transactionId?.accountId?.toString()).toBe(
+                "0.0.2",
+            );
+        });
+
+        it("accepts regenerateTransactionId: false together with transactionId", async () => {
+            await executor.run(
+                tx,
+                { transactionId: FIXED_ID, regenerateTransactionId: false },
+                SAMPLE_EVENT,
+            );
+
+            expect(executedTx().transactionId?.toString()).toBe(FIXED_ID);
+        });
+
+        it("sets the ID on the schedule wrapper, not the inner transaction", async () => {
+            await executor.scheduleRun(
+                tx,
+                { transactionId: FIXED_ID },
+                SAMPLE_EVENT,
+            );
+
+            expect(executedTx()).toBeInstanceOf(ScheduleCreateTransaction);
+            expect(executedTx().transactionId?.toString()).toBe(FIXED_ID);
+        });
+
+        it.each([
+            ["an unparsable string", "abc"],
+            ["an empty string", ""],
+            ["an ID without a valid start", "0.0.5@"],
+            ["an ID with a malformed valid start", "0.0.5@1700000000"],
+            ["a scheduled ID", `${FIXED_ID}?scheduled`],
+            ["an ID with a nonce", `${FIXED_ID}/1`],
+            [
+                "an EVM address payer",
+                "0x0000000000000000000000000000000000000005",
+            ],
+        ])(
+            "rejects %s with INPUT_INVALID before anything is sent",
+            async (_label, transactionId) => {
+                const error = await executor
+                    .run(tx, { transactionId }, SAMPLE_EVENT)
+                    .catch((e: unknown) => e);
+
+                expect(error).toBeInstanceOf(HieroError);
+                expect(error).toMatchObject({
+                    code: "INPUT_INVALID",
+                    context: "TransactionExecutor",
+                });
+                expect(ctx.emitBeforeTransaction).not.toHaveBeenCalled();
+                expect(execute).not.toHaveBeenCalled();
+            },
+        );
+
+        it("rejects a TransactionId without a valid start", async () => {
+            const id = new TransactionId(AccountId.fromString("0.0.5"), null);
+
+            await expect(
+                executor.run(tx, { transactionId: id }, SAMPLE_EVENT),
+            ).rejects.toMatchObject({
+                code: "INPUT_INVALID",
+                message:
+                    "transactionId must have an account ID and a valid start.",
+            });
+            expect(execute).not.toHaveBeenCalled();
+        });
+
+        it("rejects regenerateTransactionId: true together with transactionId", async () => {
+            await expect(
+                executor.run(
+                    tx,
+                    { transactionId: FIXED_ID, regenerateTransactionId: true },
+                    SAMPLE_EVENT,
+                ),
+            ).rejects.toMatchObject({
+                code: "INPUT_INVALID",
+                message: expect.stringMatching(/regenerateTransactionId/),
+            });
+            expect(execute).not.toHaveBeenCalled();
+        });
+
+        it("reports the set ID in the after-event and the result", async () => {
+            response.transactionId = TransactionId.fromString(FIXED_ID);
+
+            const result = await executor.run(
+                tx,
+                { transactionId: FIXED_ID },
+                SAMPLE_EVENT,
+            );
+
+            expect(result.transactionId).toBe(FIXED_ID);
+            expect(ctx.emitAfterTransaction).toHaveBeenCalledWith(
+                expect.objectContaining({ transactionId: FIXED_ID }),
+            );
+        });
+
+        it("carries the set ID on the HieroError of a failed receipt", async () => {
+            const receiptError = Object.assign(new Error("receipt for FAIL"), {
+                status: Status.InsufficientPayerBalance,
+                transactionId: TransactionId.fromString(FIXED_ID),
+            });
+            execute.mockRejectedValueOnce(receiptError);
+
+            await expect(
+                executor.run(tx, { transactionId: FIXED_ID }, SAMPLE_EVENT),
+            ).rejects.toMatchObject({
+                code: "SDK_ERROR",
+                transactionId: FIXED_ID,
+            });
+        });
+    });
+
     describe("run() — lifecycle", () => {
         it("freezes before signing, then executes, then fetches the receipt", async () => {
             const order: string[] = [];
