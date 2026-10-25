@@ -5,6 +5,7 @@
  *
  * 1. Single-key alias: ECDSA key derives both the account key and EVM alias
  * 2. Two-key alias: ED25519 controls the account, separate ECDSA key provides the alias
+ * 3. Given EVM address: the address itself is the alias; its ECDSA key signs
  *
  * Aliases are immutable once set. The derived EVM address (0x...) can be used
  * in Solidity contracts and EVM tooling (MetaMask, Hardhat, etc.).
@@ -71,6 +72,27 @@ async function main() {
         controlKey.publicKey.toStringRaw(),
     );
     console.log("   Alias key (ECDSA):", aliasKey.publicKey.toStringRaw());
+
+    // Pattern 3: Given EVM address
+    // Pass the EVM address itself (40 hex characters, with or without 0x),
+    // e.g. one a wallet already uses. The owner of that address's ECDSA key
+    // must sign.
+    const addressOwnerKey = PrivateKey.generateECDSA();
+    const evmAddress = `0x${addressOwnerKey.publicKey.toEvmAddress()}`;
+
+    const addressAccount = await accountService.createAccount({
+        publicKey: controlKey.publicKey.toStringRaw(),
+        keyType: AccountType.ED25519,
+        alias: evmAddress,
+        initialBalance: new Hbar(1),
+        memo: "ED25519 account with given EVM address",
+        // The address owner's ECDSA key must sign to prove ownership
+        additionalSigners: [addressOwnerKey],
+    });
+
+    console.log("\n3. Given EVM address");
+    console.log("   Account ID:", addressAccount.accountId);
+    console.log("   EVM address:", addressAccount.evmAddress);
 
     context.client.close();
 }
