@@ -389,11 +389,13 @@ export const SERVICE_METHODS: ServiceMethodTable = {
         },
         deleteHbarAllowance: {
             events: tx("AccountAllowanceApprove", "deleteHbarAllowance"),
-            call: (s, env) =>
+            call: (s) =>
+                // The network accepts a zero allowance to an unknown
+                // spender, so name an unknown owner instead.
                 s.deleteHbarAllowance([
                     {
-                        ownerAccountId: env.operatorId,
-                        spenderAccountId: MISSING_ID,
+                        ownerAccountId: MISSING_ID,
+                        spenderAccountId: MISSING_ID_2,
                     },
                 ]),
             invalid: (s) => s.deleteHbarAllowance([]),
@@ -520,9 +522,11 @@ export const SERVICE_METHODS: ServiceMethodTable = {
         executeContract: {
             events: tx("ContractExecute", "executeContract"),
             call: (s) =>
+                // A call to an unknown contract succeeds as a call to an
+                // empty address; gas below the intrinsic gas is rejected.
                 s.executeContract({
                     contractId: MISSING_ID,
-                    gas: 100_000,
+                    gas: 1,
                     functionName: "f",
                 }),
             invalid: (s) =>
