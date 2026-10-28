@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // ESM consumer: copied into a throwaway "type": "module" project that has
 // the packed tarballs installed, then run there. See run.mjs.
-import {
-    HieroContext,
-    PrivateKey,
-    TopicService,
-} from "@hiero-hackers/enterprise-core";
+import { HieroContext, TopicService } from "@hiero-hackers/enterprise-core";
+import { PrivateKey } from "@hiero-ledger/sdk";
 import {
     AccountRepository,
     MirrorNodeClient,
@@ -28,9 +25,12 @@ async function core() {
         if (process.env.PACKED_REQUIRE_NETWORK) {
             throw new Error("HIERO_OPERATOR_ID is not set");
         }
+
         console.log(`[${label}] core: no HIERO_OPERATOR_ID, nothing sent`);
+
         return;
     }
+
     const context = new HieroContext();
     try {
         const topics = new TopicService(context);
@@ -53,9 +53,11 @@ async function mirror() {
         "https://mainnet.mirrornode.hedera.com";
     const accounts = new AccountRepository(new MirrorNodeClient(url));
     const account = await accounts.findAccount("0.0.2");
+
     if (account.accountId !== "0.0.2") {
         throw new Error(`Expected account 0.0.2, got ${account.accountId}`);
     }
+
     console.log(`[${label}] mirror: account ${account.accountId} on ${url}`);
 }
 

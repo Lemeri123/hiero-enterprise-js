@@ -7,7 +7,8 @@
 //
 // With no step names it runs all three. `pack` needs pnpm; `consumers` only
 // needs node and npm, so it can run on any Node version once the tarballs
-// exist. Work happens in $PACKED_WORK_DIR (default: <tmp>/hiero-packed).
+// exist. Work happens in $PACKED_WORK_DIR (default: <tmp>/hiero-packed),
+// which is left behind on purpose: the consumers reuse the packed tarballs.
 //
 // The consumers submit a topic message when HIERO_OPERATOR_ID and the other
 // HIERO_* variables point at a network (Solo in CI); without them they only
@@ -49,11 +50,13 @@ function tarball(name) {
             f.startsWith(`hiero-hackers-enterprise-${name}-`) &&
             f.endsWith(".tgz"),
     );
+
     if (!file) {
         throw new Error(
             `No ${name} tarball in ${tarballs}; run the pack step first`,
         );
     }
+
     return join(tarballs, file);
 }
 
@@ -80,9 +83,12 @@ function project(name, type, packages) {
             "--no-package-lock",
             "--loglevel=error",
             ...packages.map(tarball),
+            // core's peer dependency, installed as the README says
+            ...(packages.includes("core") ? ["@hiero-ledger/sdk"] : []),
         ],
         dir,
     );
+
     return dir;
 }
 
@@ -136,6 +142,7 @@ async function bundle() {
     console.log(
         `enterprise-mirror browser bundle: ${size} minified, ${gzip} gzipped`,
     );
+
     if (process.env.GITHUB_STEP_SUMMARY) {
         appendFileSync(
             process.env.GITHUB_STEP_SUMMARY,
@@ -159,10 +166,12 @@ const steps = new Map([
 const requested = process.argv.slice(2);
 for (const name of requested.length ? requested : steps.keys()) {
     const step = steps.get(name);
+
     if (!step) {
         throw new Error(
             `Unknown step "${name}"; expected one of: ${[...steps.keys()].join(", ")}`,
         );
     }
+
     await step();
 }
