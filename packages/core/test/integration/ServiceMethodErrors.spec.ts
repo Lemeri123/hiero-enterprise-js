@@ -7,6 +7,8 @@ import {
     METHOD_ENTRIES,
     createServices,
     isNone,
+    rejectionOf,
+    rootCause,
     type CallEnv,
     type MethodEntry,
     type MethodEvents,
@@ -23,11 +25,6 @@ const rejected = METHOD_ENTRIES.filter(
     (entry): entry is RejectedEntry =>
         entry.reject === true && !isNone(entry.events),
 );
-
-/** The SDK error under any HieroError wrapping. */
-function rootCause(error: unknown): unknown {
-    return error instanceof HieroError ? rootCause(error.cause) : error;
-}
 
 describe("service method network rejections [Integration]", () => {
     let context: HieroContext;
@@ -67,12 +64,7 @@ describe("service method network rejections [Integration]", () => {
     )(
         "%s is rejected with a HieroError the after-event carries",
         async (_, entry) => {
-            let error: unknown;
-            try {
-                await entry.call(services, env);
-            } catch (thrown) {
-                error = thrown;
-            }
+            const error = await rejectionOf(() => entry.call(services, env));
 
             expect(error).toBeInstanceOf(HieroError);
             const hieroError = error as HieroError;
@@ -82,6 +74,7 @@ describe("service method network rejections [Integration]", () => {
             expect(hieroError.context).toBe(
                 `${entry.service}.${entry.events.methodName}`,
             );
+
             if (entry.events.kind !== "query") {
                 expect(hieroError.transactionId).toMatch(/^0\.0\.\d+@/);
             }

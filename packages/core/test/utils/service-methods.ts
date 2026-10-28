@@ -1,8 +1,8 @@
 /**
  * One table of every public method of the core services. It drives
- * `test/unit/service-method-events.test.ts` (listener events and input
- * validation against a mocked network) and
- * `test/integration/service-method-errors.spec.ts` (network rejections on
+ * `test/unit/services/ServiceMethodEvents.test.ts` (listener events and
+ * input validation against a mocked network) and
+ * `test/integration/ServiceMethodErrors.spec.ts` (network rejections on
  * Solo). A public method without an entry fails the type check and the
  * coverage test.
  *
@@ -24,6 +24,7 @@ import {
     TransferTransaction,
 } from "@hiero-ledger/sdk";
 import type { IHieroContext } from "../../src/context/index.js";
+import { HieroError } from "../../src/errors/index.js";
 import {
     AccountService,
     ContractService,
@@ -1226,7 +1227,8 @@ export interface MethodEntry {
     service: ServiceName;
     method: string;
     events: MethodEvents | None;
-    invalid: None | null;
+    /** `true` when the row has an input core rejects with `INPUT_INVALID`. */
+    hasInvalid: boolean;
     reject: true | None;
     call(services: Services, env: CallEnv): Promise<unknown>;
     callInvalid(services: Services, env: CallEnv): Promise<unknown>;
@@ -1241,12 +1243,13 @@ export const METHOD_ENTRIES: MethodEntry[] = Object.entries(
     const service = name as ServiceName;
     const bind = (fn: LooseCall) => async (services: Services, env: CallEnv) =>
         await fn(new Map(Object.entries(services)).get(service), env);
+
     return Object.entries(rows as Record<string, MethodCase<unknown>>).map(
         ([method, row]) => ({
             service,
             method,
             events: row.events,
-            invalid: isNone(row.invalid) ? row.invalid : null,
+            hasInvalid: !isNone(row.invalid),
             reject: row.reject,
             call: bind(row.call as LooseCall),
             callInvalid: bind(
@@ -1261,3 +1264,19 @@ export const METHOD_ENTRIES: MethodEntry[] = Object.entries(
         }),
     );
 });
+
+/** The SDK error under any HieroError wrapping. */
+export function rootCause(error: unknown): unknown {
+    return error instanceof HieroError ? rootCause(error.cause) : error;
+}
+
+/** Run a call and hand back what it threw. */
+export async function rejectionOf(run: () => Promise<unknown>) {
+    try {
+        await run();
+    } catch (error) {
+        return error;
+    }
+
+    throw new Error("expected the call to throw");
+}

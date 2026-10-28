@@ -34,9 +34,9 @@ import {
     TransactionId,
     TransactionReceiptQuery,
 } from "@hiero-ledger/sdk";
-import { HieroContext } from "../../src/context/index.js";
-import { HieroError } from "../../src/errors/index.js";
-import type { TransactionEvent } from "../../src/listeners/index.js";
+import { HieroContext } from "../../../src/context/index.js";
+import { HieroError } from "../../../src/errors/index.js";
+import type { TransactionEvent } from "../../../src/listeners/index.js";
 import {
     METHOD_ENTRIES,
     MISSING_ID,
@@ -46,11 +46,13 @@ import {
     UNKNOWN_KEY,
     createServices,
     isNone,
+    rejectionOf,
+    rootCause,
     type CallEnv,
     type MethodEntry,
     type MethodEvents,
     type Services,
-} from "../utils/service-methods.js";
+} from "../../utils/service-methods.js";
 
 // Every public service method, driven from the table in
 // test/utils/service-methods.ts. A real context and real SDK objects; only
@@ -96,21 +98,25 @@ const response = {
 
 /** The answer a node gives each consensus query. */
 function queryResult(query: unknown): unknown {
-    const epoch = Timestamp.fromDate(new Date(0));
     if (query instanceof AccountInfoQuery) {
         return { key: UNKNOWN_KEY.publicKey };
     }
+
     if (query instanceof AccountRecordsQuery) return [];
+
     if (
         query instanceof ContractByteCodeQuery ||
         query instanceof FileContentsQuery
     ) {
         return new Uint8Array();
     }
+
     if (query instanceof TransactionReceiptQuery) return receipt;
+
     if (query instanceof FileInfoQuery) {
         return { fileId: FileId.fromString(MISSING_ID), size: Long.ONE };
     }
+
     if (query instanceof ScheduleInfoQuery) {
         return {
             scheduleId: ScheduleId.fromString(MISSING_ID),
@@ -118,24 +124,28 @@ function queryResult(query: unknown): unknown {
             deleted: null,
         };
     }
+
     if (query instanceof TokenInfoQuery) {
         return { tokenId: TokenId.fromString(MISSING_ID), totalSupply: 0 };
     }
+
     if (query instanceof TokenNftInfoQuery) {
         return [
             {
                 nftId: NftId.fromString(`${MISSING_ID}/1`),
                 accountId: AccountId.fromString(OPERATOR_ID),
-                creationTime: epoch,
+                creationTime: Timestamp.fromDate(new Date(0)),
             },
         ];
     }
+
     if (query instanceof TopicInfoQuery) {
         return {
             topicId: TopicId.fromString(MISSING_ID),
             sequenceNumber: Long.ZERO,
         };
     }
+
     // ContractCallQuery, ContractInfoQuery, NetworkVersionInfoQuery,
     // TransactionRecordQuery: core hands the SDK object back unmapped.
     return {};
@@ -149,11 +159,6 @@ const networkRejection = () =>
         nodeId: AccountId.fromString("0.0.3"),
         contractFunctionResult: null,
     });
-
-/** The SDK error under any HieroError wrapping. */
-function rootCause(error: unknown): unknown {
-    return error instanceof HieroError ? rootCause(error.cause) : error;
-}
 
 const label = (entry: MethodEntry) => `${entry.service}.${entry.method}`;
 
@@ -169,7 +174,7 @@ describe("service method events", () => {
     let before: TransactionEvent[];
     let after: TransactionEvent[];
     /** Every fake that stands in for a node or the mirror node. */
-    let network: ReturnType<typeof vi.fn>[];
+    let network: ReturnType<typeof vi.spyOn>[];
 
     beforeEach(() => {
         ctx = new HieroContext({
@@ -192,61 +197,67 @@ describe("service method events", () => {
         services = createServices(ctx);
         env = { client: ctx.client, operatorId: OPERATOR_ID };
 
-        const fake = <T extends object>(
-            target: T,
-            method: keyof T & string,
-            impl: (this: unknown) => unknown,
-        ) =>
-            vi
-                .spyOn(target as Record<string, () => unknown>, method)
-                .mockImplementation(impl) as unknown as ReturnType<
-                typeof vi.fn
-            >;
-
         network = [
-            fake(Transaction.prototype, "execute", () =>
-                Promise.resolve(response),
-            ),
-            fake(Query.prototype, "execute", function (this: unknown) {
+            vi
+                .spyOn(Transaction.prototype, "execute")
+                .mockImplementation(() => Promise.resolve(response as never)),
+            vi.spyOn(Query.prototype, "execute").mockImplementation(function (
+                this: unknown,
+            ) {
                 return Promise.resolve(queryResult(this));
             }),
-            fake(ContractCreateFlow.prototype, "execute", () =>
-                Promise.resolve(response),
-            ),
-            fake(TokenRejectFlow.prototype, "execute", () =>
-                Promise.resolve(response),
-            ),
-            fake(MirrorNodeAccountBalanceQuery.prototype, "execute", () =>
-                Promise.resolve({ hbars: { toTinybars: () => Long.ONE } }),
-            ),
-            fake(MirrorNodeTokenBalanceQuery.prototype, "execute", () =>
-                Promise.resolve({
-                    tokenId: TokenId.fromString(MISSING_ID),
-                    balance: Long.ONE,
-                    decimals: 0,
-                }),
-            ),
-            fake(MirrorNodeContractCallQuery.prototype, "execute", () =>
-                Promise.resolve("0x"),
-            ),
-            fake(MirrorNodeContractEstimateQuery.prototype, "execute", () =>
-                Promise.resolve(21_000),
-            ),
-            fake(AddressBookQuery.prototype, "execute", () =>
-                Promise.resolve({ nodeAddresses: [] }),
-            ),
-            fake(FeeEstimateQuery.prototype, "execute", () =>
-                Promise.resolve({
-                    networkFee: { multiplier: 1, subtotal: Long.ONE },
-                    nodeFee: { base: Long.ONE, extras: [] },
-                    serviceFee: { base: Long.ONE, extras: [] },
-                    highVolumeMultiplier: Long.ONE,
-                    total: Long.ONE,
-                }),
-            ),
-            fake(TopicMessageQuery.prototype, "subscribe", () => ({
-                unsubscribe: vi.fn(),
-            })),
+            vi
+                .spyOn(ContractCreateFlow.prototype, "execute")
+                .mockImplementation(() => Promise.resolve(response as never)),
+            vi
+                .spyOn(TokenRejectFlow.prototype, "execute")
+                .mockImplementation(() => Promise.resolve(response as never)),
+            vi
+                .spyOn(MirrorNodeAccountBalanceQuery.prototype, "execute")
+                .mockImplementation(() =>
+                    Promise.resolve({
+                        hbars: { toTinybars: () => Long.ONE },
+                    } as never),
+                ),
+            vi
+                .spyOn(MirrorNodeTokenBalanceQuery.prototype, "execute")
+                .mockImplementation(() =>
+                    Promise.resolve({
+                        tokenId: TokenId.fromString(MISSING_ID),
+                        balance: Long.ONE,
+                        decimals: 0,
+                    }),
+                ),
+            vi
+                .spyOn(MirrorNodeContractCallQuery.prototype, "execute")
+                .mockImplementation(() => Promise.resolve("0x")),
+            vi
+                .spyOn(MirrorNodeContractEstimateQuery.prototype, "execute")
+                .mockImplementation(() => Promise.resolve(21_000)),
+            vi
+                .spyOn(AddressBookQuery.prototype, "execute")
+                .mockImplementation(() =>
+                    Promise.resolve({ nodeAddresses: [] } as never),
+                ),
+            vi
+                .spyOn(FeeEstimateQuery.prototype, "execute")
+                .mockImplementation(() =>
+                    Promise.resolve({
+                        networkFee: { multiplier: 1, subtotal: Long.ONE },
+                        nodeFee: { base: Long.ONE, extras: [] },
+                        serviceFee: { base: Long.ONE, extras: [] },
+                        highVolumeMultiplier: Long.ONE,
+                        total: Long.ONE,
+                    }),
+                ),
+            vi
+                .spyOn(TopicMessageQuery.prototype, "subscribe")
+                .mockImplementation(
+                    () =>
+                        ({
+                            unsubscribe: vi.fn(),
+                        }) as never,
+                ),
         ];
     });
 
@@ -254,16 +265,6 @@ describe("service method events", () => {
         vi.restoreAllMocks();
         ctx.close();
     });
-
-    /** Run a call and hand back what it threw. */
-    async function rejectionOf(run: () => Promise<unknown>) {
-        try {
-            await run();
-        } catch (error) {
-            return error;
-        }
-        throw new Error("expected the call to throw");
-    }
 
     describe("coverage", () => {
         const privateMethods = new Map(Object.entries(PRIVATE_METHODS));
@@ -316,6 +317,7 @@ describe("service method events", () => {
                     }),
                 ]);
                 expect(after[0].error).toBeUndefined();
+
                 if (entry.events.kind !== "query") {
                     expect(after[0].transactionId).toBe(TX_ID);
                 }
@@ -371,9 +373,10 @@ describe("service method events", () => {
 
     describe("input core validates", () => {
         it.each(
-            METHOD_ENTRIES.filter((entry) => entry.invalid === null).map(
-                (entry) => [label(entry), entry],
-            ),
+            METHOD_ENTRIES.filter((entry) => entry.hasInvalid).map((entry) => [
+                label(entry),
+                entry,
+            ]),
         )(
             "%s is rejected with INPUT_INVALID before any event",
             async (_, entry) => {
