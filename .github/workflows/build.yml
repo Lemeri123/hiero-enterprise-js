@@ -240,10 +240,9 @@ jobs:
             - name: Run examples
               env:
                   HIERO_NETWORK: hiero-solo-action
-                  HIERO_ED25519_OPERATOR_ID: ${{ steps.solo.outputs.ed25519AccountId }}
-                  HIERO_ED25519_OPERATOR_KEY: ${{ steps.solo.outputs.ed25519PrivateKey }}
-                  HIERO_ECDSA_OPERATOR_ID: ${{ steps.solo.outputs.ecdsaAccountId }}
-                  HIERO_ECDSA_OPERATOR_KEY: ${{ steps.solo.outputs.ecdsaPrivateKey }}
+                  HIERO_OPERATOR_ID: ${{ steps.solo.outputs.ed25519AccountId }}
+                  HIERO_OPERATOR_KEY: ${{ steps.solo.outputs.ed25519PrivateKey }}
+                  HIERO_OPERATOR_KEY_TYPE: ed25519
                   HIERO_MIRROR_NODE_URL: http://localhost:38081
                   HIERO_NETWORK_NODES: "127.0.0.1:35211=0.0.3"
                   HIERO_MIRROR_NETWORK: localhost:5600
