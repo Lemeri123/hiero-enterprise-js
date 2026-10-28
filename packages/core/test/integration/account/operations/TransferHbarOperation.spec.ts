@@ -55,7 +55,7 @@ describe("TransferHbarOperation [Integration]", () => {
             expect(afterTinybars - beforeTinybars).toBe(100_000_000n);
         });
 
-        it("lets another account pay for the transfer (transactionId as payer)", async () => {
+        it("lets another account pay for the transfer (payer)", async () => {
             const payer = await createTestAccount(client, 5);
             const receiver = await createTestAccount(client, 0);
 
@@ -70,7 +70,7 @@ describe("TransferHbarOperation [Integration]", () => {
                 1,
                 operatorAccountId,
                 {
-                    transactionId: payer.accountId,
+                    payer: payer.accountId,
                     additionalSigners: [payer.key],
                 },
             );

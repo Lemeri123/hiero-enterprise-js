@@ -193,10 +193,10 @@ describe("TransactionExecutor", () => {
             expect(executedTx().transactionId).toBe(id);
         });
 
-        it("generates a valid start for a bare payer account ID", async () => {
+        it("generates a transaction ID from a payer", async () => {
             const before = Date.now();
 
-            await executor.run(tx, { transactionId: "0.0.5" }, SAMPLE_EVENT);
+            await executor.run(tx, { payer: "0.0.5" }, SAMPLE_EVENT);
 
             const id = executedTx().transactionId!;
             expect(id.accountId?.toString()).toBe("0.0.5");

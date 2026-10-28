@@ -211,7 +211,7 @@ describe("FileService", () => {
         });
     });
 
-    describe("transactionId with large contents", () => {
+    describe("payer and transactionId with large contents", () => {
         const fileId = { toString: () => "0.0.12347" };
         const transactionId = "0.0.5@1700000000.000000123";
 
@@ -230,7 +230,8 @@ describe("FileService", () => {
 
             expect(create.mock.calls[0][0].transactionId).toBe(transactionId);
             // The create's own ID again would be a duplicate transaction.
-            expect(append.mock.calls[0][0].transactionId).toBe("0.0.5");
+            expect(append.mock.calls[0][0].transactionId).toBeUndefined();
+            expect(append.mock.calls[0][0].payer).toBe("0.0.5");
         });
 
         it("keeps the payer for the append after an update", async () => {
@@ -248,10 +249,27 @@ describe("FileService", () => {
                 transactionId: TransactionId.fromString(transactionId),
             });
 
-            expect(append.mock.calls[0][0].transactionId).toBe("0.0.5");
+            expect(append.mock.calls[0][0].payer).toBe("0.0.5");
         });
 
-        it("leaves the append's transactionId unset without one", async () => {
+        it("passes a payer through to the append", async () => {
+            vi.spyOn(
+                service["createOperation"],
+                "execute",
+            ).mockResolvedValueOnce({ fileId } as never);
+            const append = vi
+                .spyOn(service["appendOperation"], "execute")
+                .mockResolvedValueOnce({} as never);
+
+            await service.createFile({
+                contents: Buffer.alloc(4097),
+                payer: "0.0.5",
+            });
+
+            expect(append.mock.calls[0][0].payer).toBe("0.0.5");
+        });
+
+        it("leaves the append's payer unset without either", async () => {
             vi.spyOn(
                 service["createOperation"],
                 "execute",
@@ -263,6 +281,7 @@ describe("FileService", () => {
             await service.createFile({ contents: Buffer.alloc(4097) });
 
             expect(append.mock.calls[0][0].transactionId).toBeUndefined();
+            expect(append.mock.calls[0][0].payer).toBeUndefined();
         });
     });
 

@@ -1,4 +1,4 @@
-import { TransactionId } from "@hiero-ledger/sdk";
+import { AccountId, TransactionId } from "@hiero-ledger/sdk";
 import { validationError } from "../../errors/index.js";
 import type { TransactionOptions } from "./TransactionOptions.js";
 
@@ -12,41 +12,45 @@ const CONTEXT = "TransactionExecutor";
 const FULL_ID_PATTERN = /^\d+\.\d+\.\d+@\d+\.\d{9}(|\?scheduled)(|\/\d+)$/;
 
 /**
- * Resolve `TransactionOptions.transactionId` into the SDK `TransactionId`
- * to set on the transaction: a full ID as-is, a bare account ID as that
+ * Resolve `TransactionOptions.transactionId` or `payer` into the SDK
+ * `TransactionId` to set on the transaction: a transaction ID as-is, a
  * payer with a generated valid start.
  *
- * @returns The transaction ID, or `undefined` when none is set
- * @throws {HieroError} `INPUT_INVALID` if the ID is malformed (a full ID
- *   string must be `<shard>.<realm>.<num>@<seconds>.<nanos>` with 9-digit
- *   nanos), carries a `scheduled` flag or a nonce, names an EVM-address
- *   payer, or comes with `regenerateTransactionId: true`
+ * @returns The transaction ID, or `undefined` when neither is set
+ * @throws {HieroError} `INPUT_INVALID` if both are set, if either comes
+ *   with `regenerateTransactionId: true`, if the ID is malformed (a string
+ *   must be `<shard>.<realm>.<num>@<seconds>.<nanos>` with 9-digit nanos)
+ *   or carries a `scheduled` flag or a nonce, or if the payer is not a
+ *   `shard.realm.num` account ID
  */
 export function resolveTransactionId(
     options: TransactionOptions,
 ): TransactionId | undefined {
-    const value = options.transactionId;
+    const { transactionId: value, payer } = options;
 
-    if (value == null) {
+    if (value == null && payer == null) {
         return undefined;
+    }
+
+    if (value != null && payer != null) {
+        throw validationError(
+            CONTEXT,
+            "Set either transactionId or payer, not both: a transaction ID already names its payer.",
+        );
     }
 
     // A set ID is locked, so the SDK would silently never regenerate it.
     if (options.regenerateTransactionId === true) {
         throw validationError(
             CONTEXT,
-            "regenerateTransactionId cannot be true together with transactionId: a set transaction ID is never regenerated.",
+            "regenerateTransactionId cannot be true together with transactionId or payer: a set transaction ID is never regenerated.",
         );
     }
 
     const transactionId =
-        typeof value === "string" ? parseTransactionId(value) : value;
+        value != null ? toTransactionId(value) : fromPayer(payer!);
 
-    if (
-        !(transactionId instanceof TransactionId) ||
-        transactionId.accountId == null ||
-        transactionId.validStart == null
-    ) {
+    if (transactionId.accountId == null || transactionId.validStart == null) {
         throw validationError(
             CONTEXT,
             "transactionId must have an account ID and a valid start.",
@@ -60,32 +64,22 @@ export function resolveTransactionId(
         );
     }
 
-    if (
-        transactionId.accountId.aliasKey != null ||
-        transactionId.accountId.evmAddress != null
-    ) {
-        throw validationError(
-            CONTEXT,
-            "transactionId must name its payer as a shard.realm.num account ID.",
-        );
-    }
+    assertNumericAccount("transactionId", transactionId.accountId);
 
     return transactionId;
 }
 
-/** Parse a full transaction ID, or an account ID as the payer. */
-function parseTransactionId(value: string): TransactionId {
+/** Parse a full transaction ID string, or take a `TransactionId` as-is. */
+function toTransactionId(value: string | TransactionId): TransactionId {
+    if (value instanceof TransactionId) {
+        return value;
+    }
+
     try {
         // Check the shape first: fromString reads "0.0.5@abc.def" as valid
         // start 0 and "0.0.5@1700000000.5" as 5 ns.
         if (FULL_ID_PATTERN.test(value)) {
             return TransactionId.fromString(value);
-        }
-
-        if (!value.includes("@")) {
-            // Generate from the string: from an AccountId, the SDK copies only
-            // shard.realm.num and drops an EVM address, hiding it from the check.
-            return TransactionId.generate(value);
         }
     } catch {
         // Fall through to the error below.
@@ -93,6 +87,37 @@ function parseTransactionId(value: string): TransactionId {
 
     throw validationError(
         CONTEXT,
-        `transactionId "${value}" is not a transaction ID (e.g. 0.0.5@1700000000.000000123, with 9-digit nanos) or an account ID (e.g. 0.0.5).`,
+        `transactionId "${value}" is not a transaction ID (e.g. 0.0.5@1700000000.000000123, with 9-digit nanos). To only set who pays, use payer.`,
     );
+}
+
+/** Generate a transaction ID paid by `payer`, valid from now. */
+function fromPayer(payer: string | AccountId): TransactionId {
+    let accountId: AccountId;
+
+    try {
+        accountId =
+            typeof payer === "string" ? AccountId.fromString(payer) : payer;
+    } catch {
+        throw validationError(
+            CONTEXT,
+            `payer "${payer}" is not an account ID (e.g. 0.0.5).`,
+        );
+    }
+
+    // Check before generating: TransactionId.generate copies only
+    // shard.realm.num and would drop an alias or EVM address.
+    assertNumericAccount("payer", accountId);
+
+    return TransactionId.generate(accountId);
+}
+
+/** Reject an alias or EVM-address account: the payer must be shard.realm.num. */
+function assertNumericAccount(name: string, accountId: AccountId): void {
+    if (accountId.aliasKey != null || accountId.evmAddress != null) {
+        throw validationError(
+            CONTEXT,
+            `${name} must name its payer as a shard.realm.num account ID.`,
+        );
+    }
 }

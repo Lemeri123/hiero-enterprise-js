@@ -146,7 +146,7 @@ export class TransactionExecutor {
      * Apply the base `TransactionOptions` fields to the SDK transaction before
      * it is frozen or executed.
      *
-     * @throws {HieroError} `INPUT_INVALID` for an invalid `transactionId`,
+     * @throws {HieroError} `INPUT_INVALID` for an invalid `transactionId` or `payer`,
      *   before the before-event is emitted
      */
     private applyBaseOptions(

@@ -6,7 +6,7 @@ import { HieroError } from "../../../../src/errors/index.js";
 const FIXED_ID = "0.0.5@1700000000.000000123";
 
 describe("resolveTransactionId", () => {
-    it("returns undefined without a transactionId", () => {
+    it("returns undefined without a transactionId or payer", () => {
         expect(resolveTransactionId({})).toBeUndefined();
     });
 
@@ -33,17 +33,23 @@ describe("resolveTransactionId", () => {
         expect(resolveTransactionId({ transactionId: sdkId })).toBe(sdkId);
     });
 
-    it("generates a recent valid start for a bare payer account ID", () => {
-        const before = Date.now();
+    it.each([
+        ["a string", "0.0.5"],
+        ["an AccountId", AccountId.fromString("0.0.5")],
+    ])(
+        "generates a recent valid start for a payer given as %s",
+        (_label, payer) => {
+            const before = Date.now();
 
-        const id = resolveTransactionId({ transactionId: "0.0.5" });
+            const id = resolveTransactionId({ payer });
 
-        expect(id?.accountId?.toString()).toBe("0.0.5");
-        // TransactionId.generate backdates the valid start by a few seconds.
-        const validStartMs = id!.validStart!.toDate().getTime();
-        expect(validStartMs).toBeGreaterThan(before - 60_000);
-        expect(validStartMs).toBeLessThanOrEqual(Date.now());
-    });
+            expect(id?.accountId?.toString()).toBe("0.0.5");
+            // TransactionId.generate backdates the valid start by a few seconds.
+            const validStartMs = id!.validStart!.toDate().getTime();
+            expect(validStartMs).toBeGreaterThan(before - 60_000);
+            expect(validStartMs).toBeLessThanOrEqual(Date.now());
+        },
+    );
 
     it("accepts regenerateTransactionId: false", () => {
         const id = resolveTransactionId({
@@ -66,21 +72,50 @@ describe("resolveTransactionId", () => {
         ["an ID with an unknown suffix", `${FIXED_ID}?foo`],
         ["a scheduled ID", `${FIXED_ID}?scheduled`],
         ["an ID with a nonce", `${FIXED_ID}/1`],
-        ["an EVM address payer", "0x0000000000000000000000000000000000000005"],
-    ])("rejects %s with INPUT_INVALID", (_label, transactionId) => {
-        let error: unknown;
+        ["a bare account ID (use payer)", "0.0.5"],
+        ["an EVM address", "0x0000000000000000000000000000000000000005"],
+    ])(
+        "rejects transactionId %s with INPUT_INVALID",
+        (_label, transactionId) => {
+            let error: unknown;
 
-        try {
-            resolveTransactionId({ transactionId });
-        } catch (e) {
-            error = e;
-        }
+            try {
+                resolveTransactionId({ transactionId });
+            } catch (e) {
+                error = e;
+            }
 
-        expect(error).toBeInstanceOf(HieroError);
-        expect(error).toMatchObject({
-            code: "INPUT_INVALID",
-            context: "TransactionExecutor",
-        });
+            expect(error).toBeInstanceOf(HieroError);
+            expect(error).toMatchObject({
+                code: "INPUT_INVALID",
+                context: "TransactionExecutor",
+            });
+        },
+    );
+
+    it("points a bare account ID in transactionId to payer", () => {
+        expect(() => resolveTransactionId({ transactionId: "0.0.5" })).toThrow(
+            /use payer/,
+        );
+    });
+
+    it.each([
+        ["an unparsable string", "abc"],
+        ["a full transaction ID", FIXED_ID],
+        ["an EVM address", "0x0000000000000000000000000000000000000005"],
+    ])("rejects payer %s with INPUT_INVALID", (_label, payer) => {
+        expect(() => resolveTransactionId({ payer })).toThrow(
+            expect.objectContaining({
+                code: "INPUT_INVALID",
+                context: "TransactionExecutor",
+            }),
+        );
+    });
+
+    it("rejects transactionId together with payer", () => {
+        expect(() =>
+            resolveTransactionId({ transactionId: FIXED_ID, payer: "0.0.6" }),
+        ).toThrow("Set either transactionId or payer, not both");
     });
 
     it("rejects a scheduled TransactionId instance", () => {
@@ -99,12 +134,18 @@ describe("resolveTransactionId", () => {
         );
     });
 
-    it("rejects regenerateTransactionId: true together with transactionId", () => {
-        expect(() =>
-            resolveTransactionId({
-                transactionId: FIXED_ID,
-                regenerateTransactionId: true,
-            }),
-        ).toThrow(/regenerateTransactionId/);
-    });
+    it.each([
+        ["transactionId", { transactionId: FIXED_ID }],
+        ["payer", { payer: "0.0.5" }],
+    ])(
+        "rejects regenerateTransactionId: true together with %s",
+        (_label, options) => {
+            expect(() =>
+                resolveTransactionId({
+                    ...options,
+                    regenerateTransactionId: true,
+                }),
+            ).toThrow(/regenerateTransactionId/);
+        },
+    );
 });

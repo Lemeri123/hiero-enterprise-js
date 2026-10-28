@@ -115,7 +115,7 @@ export class FileService {
      * (~4 KiB) they are automatically split.
      * The leading chunk is submitted via `FileCreateTransaction`,
      * and the remainder is appended via a single `FileAppendTransaction`
-     * (which the SDK further sub-chunks internally). With a
+     * (which the SDK further sub-chunks internally). With a `payer` or a
      * `transactionId`, the append is paid by the same payer under its own
      * transaction ID.
      *
@@ -186,7 +186,8 @@ export class FileService {
             try {
                 await this.appendOperation.execute({
                     ...options,
-                    transactionId: appendTransactionId(options),
+                    transactionId: undefined,
+                    payer: appendPayer(options),
                     fileId: result.fileId,
                     contents: tail,
                 });
@@ -233,8 +234,8 @@ export class FileService {
      * When `contents` exceeds the per-transaction network limit
      * (~4 KiB), the leading chunk goes into the `FileUpdate` and the
      * remainder into a single follow-up `FileAppendTransaction`. With a
-     * `transactionId`, the append is paid by the same payer under its own
-     * transaction ID.
+     * `payer` or a `transactionId`, the append is paid by the same payer
+     * under its own transaction ID.
      *
      * Every key in the file's existing `keys` must sign; rotating
      * `keys` to a new list additionally requires the new keys to sign.
@@ -264,7 +265,8 @@ export class FileService {
             try {
                 await this.appendOperation.execute({
                     ...options,
-                    transactionId: appendTransactionId(options),
+                    transactionId: undefined,
+                    payer: appendPayer(options),
                     fileId: options.fileId,
                     contents: tail,
                 });
@@ -405,14 +407,15 @@ function splitContents(
 }
 
 /**
- * The follow-up append's `transactionId`: reusing the create / update's
- * ID would make the append a duplicate, so it keeps only the payer and
- * gets its own valid start.
+ * The follow-up append's payer: reusing the create / update's transaction
+ * ID would make the append a duplicate, so it keeps only the payer and gets
+ * its own transaction ID.
  */
-function appendTransactionId(options: TransactionOptions): string | undefined {
-    return resolveTransactionId({
-        transactionId: options.transactionId,
-    })?.accountId?.toString();
+function appendPayer(options: TransactionOptions): string | undefined {
+    return (
+        options.payer?.toString() ??
+        resolveTransactionId(options)?.accountId?.toString()
+    );
 }
 
 /**
