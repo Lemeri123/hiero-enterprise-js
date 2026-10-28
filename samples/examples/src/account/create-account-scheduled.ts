@@ -20,10 +20,10 @@
  * Run: pnpm tsx src/account/create-account-scheduled.ts
  */
 
+import { PrivateKey } from "@hiero-ledger/sdk";
 import {
     AccountService,
     HieroContext,
-    PrivateKey,
     resolveConfigFromEnv,
 } from "@hiero-hackers/enterprise-core";
 import type { ScheduleOptions } from "@hiero-hackers/enterprise-core";

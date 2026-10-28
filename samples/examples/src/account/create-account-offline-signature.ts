@@ -24,10 +24,10 @@
  * Run: pnpm tsx src/account/create-account-offline-signature.ts
  */
 
+import { PrivateKey } from "@hiero-ledger/sdk";
 import {
     AccountService,
     HieroContext,
-    PrivateKey,
     resolveConfigFromEnv,
 } from "@hiero-hackers/enterprise-core";
 

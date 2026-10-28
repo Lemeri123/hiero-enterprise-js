@@ -28,10 +28,10 @@
  * Run: pnpm tsx src/file/create-file.ts
  */
 
+import { PrivateKey } from "@hiero-ledger/sdk";
 import {
     FileService,
     HieroContext,
-    PrivateKey,
     resolveConfigFromEnv,
 } from "@hiero-hackers/enterprise-core";
 

@@ -23,11 +23,11 @@
  * Run: pnpm tsx src/token/burn-token.ts
  */
 
+import { PrivateKey } from "@hiero-ledger/sdk";
 import {
     AccountService,
     AccountType,
     HieroContext,
-    PrivateKey,
     TokenService,
     resolveConfigFromEnv,
 } from "@hiero-hackers/enterprise-core";

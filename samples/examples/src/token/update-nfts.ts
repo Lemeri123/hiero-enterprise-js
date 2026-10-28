@@ -36,11 +36,11 @@
  * Run: pnpm tsx src/token/update-nfts.ts
  */
 
+import { PrivateKey } from "@hiero-ledger/sdk";
 import {
     AccountService,
     AccountType,
     HieroContext,
-    PrivateKey,
     TokenService,
     resolveConfigFromEnv,
 } from "@hiero-hackers/enterprise-core";

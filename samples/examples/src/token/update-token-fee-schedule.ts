@@ -22,12 +22,11 @@
  * Run: pnpm tsx src/token/update-token-fee-schedule.ts
  */
 
+import { CustomFixedFee, PrivateKey } from "@hiero-ledger/sdk";
 import {
     AccountService,
     AccountType,
-    CustomFixedFee,
     HieroContext,
-    PrivateKey,
     TokenService,
     resolveConfigFromEnv,
 } from "@hiero-hackers/enterprise-core";

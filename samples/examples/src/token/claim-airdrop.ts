@@ -42,14 +42,17 @@
  * Run: pnpm tsx src/token/claim-airdrop.ts
  */
 
-import type { AccountId, TokenId } from "@hiero-hackers/enterprise-core";
+import {
+    type AccountId,
+    type TokenId,
+    NftId,
+    PendingAirdropId,
+    PrivateKey,
+} from "@hiero-ledger/sdk";
 import {
     AccountService,
     AccountType,
     HieroContext,
-    NftId,
-    PendingAirdropId,
-    PrivateKey,
     TokenService,
     resolveConfigFromEnv,
 } from "@hiero-hackers/enterprise-core";

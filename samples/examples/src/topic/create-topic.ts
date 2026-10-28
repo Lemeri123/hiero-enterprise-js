@@ -28,9 +28,9 @@
  * Run: pnpm tsx src/topic/create-topic.ts
  */
 
+import { PrivateKey } from "@hiero-ledger/sdk";
 import {
     HieroContext,
-    PrivateKey,
     TopicService,
     resolveConfigFromEnv,
 } from "@hiero-hackers/enterprise-core";

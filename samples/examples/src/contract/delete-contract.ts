@@ -37,10 +37,10 @@
  * Run: pnpm tsx src/contract/delete-contract.ts
  */
 
+import { PrivateKey } from "@hiero-ledger/sdk";
 import {
     ContractService,
     HieroContext,
-    PrivateKey,
     resolveConfigFromEnv,
 } from "@hiero-hackers/enterprise-core";
 

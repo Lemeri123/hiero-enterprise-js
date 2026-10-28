@@ -41,10 +41,9 @@
  * Run: pnpm tsx src/contract/execute-contract.ts
  */
 
+import { ContractFunctionParameters, Hbar } from "@hiero-ledger/sdk";
 import {
-    ContractFunctionParameters,
     ContractService,
-    Hbar,
     HieroContext,
     resolveConfigFromEnv,
 } from "@hiero-hackers/enterprise-core";

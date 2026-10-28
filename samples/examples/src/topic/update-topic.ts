@@ -24,9 +24,9 @@
  * Run: pnpm tsx src/topic/update-topic.ts
  */
 
+import { PrivateKey } from "@hiero-ledger/sdk";
 import {
     HieroContext,
-    PrivateKey,
     TopicService,
     resolveConfigFromEnv,
 } from "@hiero-hackers/enterprise-core";
