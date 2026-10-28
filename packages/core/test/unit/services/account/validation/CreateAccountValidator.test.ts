@@ -74,6 +74,18 @@ describe("CreateAccountValidator", () => {
                 }),
             ).not.toThrow();
         });
+
+        it("throws when an ecdsaPublicKey alias is combined with key", () => {
+            expect(() =>
+                validator.validate({
+                    key: PrivateKey.generateED25519().publicKey,
+                    alias: {
+                        ecdsaPublicKey:
+                            PrivateKey.generateECDSA().publicKey.toStringRaw(),
+                    },
+                }),
+            ).toThrow(/alias is not supported when using 'key' directly/);
+        });
     });
 
     describe("alias", () => {
