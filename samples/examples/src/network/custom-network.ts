@@ -32,13 +32,14 @@ function waitForMirror(): Promise<void> {
 }
 
 async function main() {
-    // Read the network, its nodes and the operator from the HIERO_* environment
-    // variables.
+    // Read the network, its nodes and the operator from HIERO_* variables.
     const config = resolveConfigFromEnv();
+
     if (!config.networkNodes) {
         console.log(
             'Set HIERO_NETWORK_NODES (e.g. "127.0.0.1:50211=0.0.3") to run this example.',
         );
+
         return;
     }
 

@@ -2,7 +2,7 @@
 
 Runnable scripts for `@hiero-hackers/enterprise-core` and `@hiero-hackers/enterprise-mirror`, one feature per file.
 
-Each file is self-contained: it imports only the enterprise packages and Node built-ins, and repeats its own setup, constants and helpers, so you can copy any one of them out as a starting point. The scripts make live network calls.
+Each file is self-contained: it imports only the enterprise packages, `@hiero-ledger/sdk` and Node built-ins, and repeats its own setup, constants and helpers, so you can copy any one of them out as a starting point. The scripts make live network calls.
 
 ## Run
 

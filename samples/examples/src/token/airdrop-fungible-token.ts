@@ -72,6 +72,7 @@ async function createKeyedAccount(
         initialBalance,
         memo,
     });
+
     return { accountId: account.accountId.toString(), key };
 }
 

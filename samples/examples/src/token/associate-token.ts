@@ -117,14 +117,17 @@ async function scheduleAssociateToken(
         );
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+
         if (message.includes("SCHEDULED_TRANSACTION_NOT_IN_WHITELIST")) {
             console.log(
                 "Scheduled token associate is not enabled on this network.",
             );
             console.log("Skipping scheduled associate scenario.");
             console.log();
+
             return;
         }
+
         throw error;
     }
 

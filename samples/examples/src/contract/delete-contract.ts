@@ -70,6 +70,7 @@ async function deployDeletableContract(
         additionalSigners: [adminKey],
     });
     console.log(`Deployed ${label} contract:`, contractId);
+
     return { contractId: contractId.toString(), adminKey };
 }
 

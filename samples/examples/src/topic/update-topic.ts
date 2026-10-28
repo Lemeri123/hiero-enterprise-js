@@ -47,6 +47,7 @@ async function createMutableTopic(
         autoRenewAccountId: context.operatorAccountId,
         additionalSigners: [adminKey],
     });
+
     return { topicId, adminKey };
 }
 

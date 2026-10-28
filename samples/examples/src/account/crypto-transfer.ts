@@ -26,7 +26,7 @@
  * For a custom network such as local Solo, also set HIERO_NETWORK_NODES,
  * HIERO_MIRROR_NETWORK and HIERO_MIRROR_NODE_URL.
  *
- * Run: pnpm tsx src/account/transfer.ts
+ * Run: pnpm tsx src/account/crypto-transfer.ts
  */
 
 import { PrivateKey, Hbar } from "@hiero-ledger/sdk";
