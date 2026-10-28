@@ -87,8 +87,15 @@ export interface TransactionOptions {
      * scheduled variant it applies to the `ScheduleCreateTransaction`;
      * the scheduled transaction's payer is `ScheduleOptions.payerAccountId`.
      *
-     * A malformed ID, or one with a `scheduled` flag or a nonce, is
-     * rejected with an `INPUT_INVALID` `HieroError` before anything is sent.
+     * A full ID string must be `<shard>.<realm>.<num>@<seconds>.<nanos>`,
+     * with the nanos zero-padded to 9 digits as `TransactionId.toString()`
+     * prints them.
+     *
+     * The valid start must lie within the network's window (not in the
+     * future, not older than `transactionValidDuration`); otherwise the
+     * network rejects it. A malformed ID, one with a `scheduled` flag or a
+     * nonce, or an EVM-address payer is rejected with an `INPUT_INVALID`
+     * `HieroError` before anything is sent.
      */
     transactionId?: string | TransactionId;
 

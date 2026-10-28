@@ -155,6 +155,7 @@ export class TransactionExecutor {
     ): void {
         // Resolve first, so an invalid ID throws before any setter runs.
         const transactionId = resolveTransactionId(options);
+
         if (transactionId != null) {
             tx.setTransactionId(transactionId);
         }
